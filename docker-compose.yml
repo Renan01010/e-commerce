@@ -15,6 +15,20 @@ services:
       timeout: 3s
       retries: 10
 
+  user-database-init:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-techstore_product_db}
+      POSTGRES_USER: ${POSTGRES_USER:-techstore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in .env}
+      USER_POSTGRES_DB: ${USER_POSTGRES_DB:-techstore_user_db}
+    volumes:
+      - ./docker/postgres/init-user-database.sh:/usr/local/bin/init-user-database.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/init-user-database.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   product-service:
     build:
       context: .
