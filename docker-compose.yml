@@ -47,13 +47,15 @@ services:
       - "8080:8080"
 
   frontend:
-    build: ./frontend
-    environment:
-      VITE_API_URL: http://localhost:8080/api
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
     depends_on:
       - api-gateway
     ports:
-      - "5173:5173"
+      - "5173:8080"
 
 volumes:
   product_data:

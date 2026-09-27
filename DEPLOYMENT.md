@@ -34,6 +34,19 @@ Construa os módulos com `mvn -f backend/pom.xml clean package`. As imagens Dock
 
 O Compose da raiz é destinado ao desenvolvimento local: ele publica portas de desenvolvimento e inicia o Vite. Não o exponha diretamente à internet como deployment de produção.
 
+## Railway (monorepo)
+
+Railpack tentou detectar um único aplicativo na raiz do repositório, mas o TechStore é composto por serviços independentes. O `Dockerfile` raiz agora cria o API Gateway, resolvendo o build inicial da raiz. Para publicar o sistema completo, crie serviços separados no mesmo projeto Railway:
+
+1. **API Gateway**: builder Dockerfile, caminho `Dockerfile` (ou `backend/api-gateway/Dockerfile`), contexto na raiz. Gere um domínio público para este serviço.
+2. **Product Service**: builder Dockerfile, caminho `backend/product-service/Dockerfile`, contexto na raiz. Configure `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` usando as referências do PostgreSQL Railway, além de `TECHSTORE_JWT_SECRET`.
+3. **PostgreSQL**: adicione o serviço PostgreSQL gerenciado ao projeto; não exponha a porta do banco publicamente.
+4. **Frontend**: builder Dockerfile, caminho `frontend/Dockerfile`, contexto na raiz. Configure `VITE_API_URL` com a URL pública do Gateway terminada em `/api` antes do build.
+
+No Gateway, configure `PRODUCT_SERVICE_URL` como a URL privada do Product Service, usando o domínio e a porta interna desse serviço, e compartilhe o mesmo `TECHSTORE_JWT_SECRET` com o Product Service. Em ambos os serviços Java configure `CORS_ALLOWED_ORIGINS` com a origem pública exata do frontend. Configure health check do Gateway em `/actuator/health` e do frontend em `/health`.
+
+Não defina o root directory como `backend/api-gateway` ou `backend/product-service`: os Dockerfiles Maven precisam do contexto na raiz para copiar o POM pai `backend/pom.xml`. Para publicar somente a interface via Railpack, configure o root directory como `frontend`; para o fluxo Docker documentado acima, selecione explicitamente o Dockerfile `frontend/Dockerfile`.
+
 ## Diagnóstico
 
 - Falha de conexão com banco: verifique DNS, porta, credenciais e health check do PostgreSQL.
