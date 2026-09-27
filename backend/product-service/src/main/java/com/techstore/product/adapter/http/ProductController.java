@@ -39,16 +39,16 @@ public class ProductController {
     @GetMapping
     @Operation(summary = "Listar, pesquisar, filtrar e ordenar produtos")
     public ProductPageResponse list(
-            @RequestParam(required = false) String query,
-            @RequestParam(required = false) UUID categoryId,
-            @RequestParam(required = false) @DecimalMin("0.00") BigDecimal minPrice,
-            @RequestParam(required = false) @DecimalMin("0.00") BigDecimal maxPrice,
-            @RequestParam(required = false) Boolean inStock,
-            @RequestParam(required = false) String brand,
-            @RequestParam(defaultValue = "relevance") @Pattern(regexp = "relevance|price|name|newest") String sortBy,
-            @RequestParam(defaultValue = "desc") @Pattern(regexp = "asc|desc") String sortOrder,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int pageSize,
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "categoryId", required = false) UUID categoryId,
+            @RequestParam(name = "minPrice", required = false) @DecimalMin("0.00") BigDecimal minPrice,
+            @RequestParam(name = "maxPrice", required = false) @DecimalMin("0.00") BigDecimal maxPrice,
+            @RequestParam(name = "inStock", required = false) Boolean inStock,
+            @RequestParam(name = "brand", required = false) String brand,
+            @RequestParam(name = "sortBy", defaultValue = "relevance") @Pattern(regexp = "relevance|price|name|newest") String sortBy,
+            @RequestParam(name = "sortOrder", defaultValue = "desc") @Pattern(regexp = "asc|desc") String sortOrder,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "pageSize", defaultValue = "20") @Min(1) @Max(100) int pageSize,
             Authentication authentication) {
         var result = products.search(query, categoryId, minPrice, maxPrice, inStock, brand,
                 sortBy, sortOrder, page, pageSize);
@@ -57,7 +57,7 @@ public class ProductController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Consultar detalhes de produto ativo")
-    public ProductResponse get(@PathVariable UUID id, Authentication authentication) {
+    public ProductResponse get(@PathVariable(name = "id") UUID id, Authentication authentication) {
         return ProductResponse.from(products.get(id), isAdmin(authentication));
     }
 
@@ -74,7 +74,7 @@ public class ProductController {
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar produto (ADMIN)")
     @SecurityRequirement(name = "bearerAuth")
-    public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateProductRequest request,
+    public ProductResponse update(@PathVariable(name = "id") UUID id, @Valid @RequestBody UpdateProductRequest request,
                                   Authentication authentication) {
         var product = products.update(id, request.name(), request.description(), request.price(), request.cost(),
                 request.brand(), request.quantity(), request.imageUrl(), actor(authentication));
@@ -85,7 +85,7 @@ public class ProductController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Desativar produto (ADMIN)")
     @SecurityRequirement(name = "bearerAuth")
-    public void deactivate(@PathVariable UUID id, Authentication authentication) {
+    public void deactivate(@PathVariable(name = "id") UUID id, Authentication authentication) {
         products.deactivate(id, actor(authentication));
     }
 

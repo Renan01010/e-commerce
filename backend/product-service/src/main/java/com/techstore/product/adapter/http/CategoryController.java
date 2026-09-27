@@ -35,7 +35,7 @@ public class CategoryController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Consultar categoria")
-    public CategoryResponse get(@PathVariable UUID id) { return CategoryResponse.from(categories.get(id)); }
+    public CategoryResponse get(@PathVariable(name = "id") UUID id) { return CategoryResponse.from(categories.get(id)); }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,7 +49,7 @@ public class CategoryController {
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar categoria (ADMIN)")
     @SecurityRequirement(name = "bearerAuth")
-    public CategoryResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateCategoryRequest request,
+    public CategoryResponse update(@PathVariable(name = "id") UUID id, @Valid @RequestBody UpdateCategoryRequest request,
                                    Authentication authentication) {
         return CategoryResponse.from(categories.update(id, request.name(), request.description(),
                 request.displayOrder(), null, authentication.getName()));
@@ -59,7 +59,7 @@ public class CategoryController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Desativar categoria (ADMIN)")
     @SecurityRequirement(name = "bearerAuth")
-    public void deactivate(@PathVariable UUID id, Authentication authentication) {
+    public void deactivate(@PathVariable(name = "id") UUID id, Authentication authentication) {
         categories.deactivate(id, authentication.getName());
     }
 }
