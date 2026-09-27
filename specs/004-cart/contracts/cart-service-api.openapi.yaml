@@ -1,0 +1,247 @@
+openapi: 3.1.0
+info:
+  title: API do Serviço de Carrinho - TechStore
+  description: Contrato REST do carrinho autenticado; acessível pelo API Gateway.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: Gateway local
+tags:
+  - name: Carrinho
+paths:
+  /cart:
+    get:
+      operationId: getCart
+      summary: Consultar carrinho do usuário autenticado
+      tags: [Carrinho]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Carrinho atual; vazio quando ainda não materializado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+    delete:
+      operationId: clearCart
+      summary: Remover todos os itens do usuário autenticado
+      tags: [Carrinho]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Carrinho limpo ou já vazio.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cart/items:
+    post:
+      operationId: addCartItem
+      summary: Adicionar produto ou somar quantidade existente
+      tags: [Carrinho]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '200':
+          description: Item consolidado; retorna o carrinho atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '201':
+          description: Nova linha criada; retorna o carrinho atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Produto inexistente ou inativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /cart/items/{productId}:
+    put:
+      operationId: setCartItemQuantity
+      summary: Substituir quantidade de um item do usuário autenticado
+      tags: [Carrinho]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetCartItemQuantityRequest'
+      responses:
+        '200':
+          description: Quantidade substituída; retorna o carrinho atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Item não pertence ao carrinho ou produto inexistente/inativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+    delete:
+      operationId: removeCartItem
+      summary: Remover item do carrinho do usuário autenticado
+      tags: [Carrinho]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: Item removido.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Item não pertence ao carrinho do usuário autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      description: UUID do produto.
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Request inválido ou quantidade não positiva.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: JWT ausente, inválido ou expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    DependencyUnavailable:
+      description: Product Service indisponível ou excedeu o timeout.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    AddCartItemRequest:
+      type: object
+      additionalProperties: false
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+    SetCartItemQuantityRequest:
+      type: object
+      additionalProperties: false
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+    CartResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+    CartItem:
+      type: object
+      additionalProperties: false
+      required: [productId, quantity, available, product]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+        available:
+          type: boolean
+        product:
+          anyOf:
+            - $ref: '#/components/schemas/ProductSummary'
+            - type: 'null'
+    ProductSummary:
+      type: object
+      additionalProperties: false
+      required: [name, price, brand, imageUrl]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          minimum: 0
+        brand:
+          anyOf:
+            - type: string
+            - type: 'null'
+        imageUrl:
+          anyOf:
+            - type: string
+              format: uri
+            - type: 'null'
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        details:
+          type: string
+        correlationId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

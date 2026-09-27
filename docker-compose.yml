@@ -32,6 +32,39 @@ services:
     ports:
       - "8081:8081"
 
+  cart-database-init:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-techstore_product_db}
+      POSTGRES_USER: ${POSTGRES_USER:-techstore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in .env}
+      CART_POSTGRES_DB: ${CART_POSTGRES_DB:-techstore_cart_db}
+    volumes:
+      - ./docker/postgres/init-cart-database.sh:/usr/local/bin/init-cart-database.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/init-cart-database.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: backend/cart-service/Dockerfile
+    environment:
+      SERVER_PORT: ${CART_SERVICE_PORT:-8083}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${CART_POSTGRES_DB:-techstore_cart_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-techstore}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in .env}
+      TECHSTORE_JWT_SECRET: ${TECHSTORE_JWT_SECRET:?Configure TECHSTORE_JWT_SECRET in .env}
+      PRODUCT_SERVICE_URL: http://product-service:8081
+    depends_on:
+      cart-database-init:
+        condition: service_completed_successfully
+      product-service:
+        condition: service_started
+    ports:
+      - "${CART_SERVICE_PORT:-8083}:${CART_SERVICE_PORT:-8083}"
+
   api-gateway:
     build:
       context: .
@@ -39,10 +72,12 @@ services:
     environment:
       SERVER_PORT: 8080
       PRODUCT_SERVICE_URL: http://product-service:8081
+      CART_SERVICE_URL: http://cart-service:8083
       TECHSTORE_JWT_SECRET: ${TECHSTORE_JWT_SECRET:?Configure TECHSTORE_JWT_SECRET in .env}
       CORS_ALLOWED_ORIGINS: http://localhost:5173
     depends_on:
       - product-service
+      - cart-service
     ports:
       - "8080:8080"
 

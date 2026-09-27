@@ -11,6 +11,10 @@ spring:
           uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/products/**,/api/categories/**
+        - id: cart-service
+          uri: ${CART_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/cart/**
       globalcors:
         cors-configurations:
           '[/**]':
