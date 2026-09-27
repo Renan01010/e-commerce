@@ -11,6 +11,12 @@ spring:
           uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/products/**,/api/categories/**
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/auth/**,/api/users/**
+          filters:
+            - StripPrefix=1
       globalcors:
         cors-configurations:
           '[/**]':
@@ -21,10 +27,13 @@ spring:
             allowCredentials: false
 
 management:
+  endpoint:
+    gateway:
+      enabled: true
   endpoints:
     web:
       exposure:
-        include: health,metrics
+        include: health,metrics,gateway
 
 logging:
   pattern:
