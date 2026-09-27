@@ -1,0 +1,334 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Schemas de Eventos - Serviço de Produtos",
+  "description": "Esquemas de eventos de domínio para comunicação assíncrona entre serviços TechStore (Phase 3+: Integração com Kafka)",
+  "definitions": {
+    "EventEnvelope": {
+      "type": "object",
+      "description": "Envelope padrão que envolve todos os eventos de domínio",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "version",
+        "source",
+        "correlationId",
+        "data"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Identificador único do evento"
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Tipo de evento qualificado (ex: ProductCreated, ProductUpdated)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de quando o evento ocorreu (UTC, ISO 8601)"
+        },
+        "version": {
+          "type": "string",
+          "description": "Versão do schema do evento"
+        },
+        "source": {
+          "type": "string",
+          "const": "product-service",
+          "description": "Serviço que gerou o evento"
+        },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID de correlação para rastreamento de operações distribuídas"
+        },
+        "data": {
+          "type": "object",
+          "description": "Dados específicos do evento"
+        }
+      }
+    },
+
+    "ProductCreated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "ProductCreated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados do produto criado",
+              "required": [
+                "productId",
+                "name",
+                "sku",
+                "categoryId",
+                "price",
+                "quantity"
+              ],
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID do produto criado"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Nome do produto"
+                },
+                "sku": {
+                  "type": "string",
+                  "description": "Stock Keeping Unit"
+                },
+                "categoryId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Categoria do produto"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Preço do produto"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "description": "Quantidade inicial"
+                },
+                "brand": {
+                  "type": "string",
+                  "description": "Marca do produto"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Descrição do produto"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "description": "URL da imagem primária"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "ProductUpdated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "ProductUpdated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados do produto atualizado",
+              "required": ["productId"],
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID do produto"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Nome atualizado do produto"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Preço atualizado"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "description": "Quantidade atualizada"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Descrição atualizada"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "description": "URL de imagem atualizada"
+                },
+                "changedFields": {
+                  "type": "array",
+                  "description": "Lista de campos que foram alterados",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "ProductDeactivated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "ProductDeactivated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados do produto desativado",
+              "required": ["productId"],
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID do produto desativado"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Motivo da desativação (admin_action, discontinued, etc)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "CategoryCreated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "CategoryCreated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados da categoria criada",
+              "required": ["categoryId", "name"],
+              "properties": {
+                "categoryId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID da categoria criada"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Nome da categoria"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Descrição da categoria"
+                },
+                "parentCategoryId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Categoria pai (se hierárquica)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "CategoryUpdated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "CategoryUpdated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados da categoria atualizada",
+              "required": ["categoryId"],
+              "properties": {
+                "categoryId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID da categoria"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Nome atualizado"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Descrição atualizada"
+                },
+                "displayOrder": {
+                  "type": "integer",
+                  "description": "Ordem de exibição atualizada"
+                },
+                "changedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "CategoryDeactivated": {
+      "allOf": [
+        { "$ref": "#/definitions/EventEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "CategoryDeactivated"
+            },
+            "data": {
+              "type": "object",
+              "description": "Dados da categoria desativada",
+              "required": ["categoryId"],
+              "properties": {
+                "categoryId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID da categoria desativada"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Motivo da desativação"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+
+  "notes": {
+    "phaseImplementation": "Phase 3+ (Implementação Futura)",
+    "technology": "Apache Kafka com schema registry",
+    "topics": [
+      "product-events",
+      "category-events"
+    ],
+    "messageFormat": "JSON com schema compliance",
+    "consumerServices": [
+      "Order Service (para validação de produtos em pedidos)",
+      "Inventory Service (para sincronização de estoque)",
+      "Search Service (para indexação em tempo real)",
+      "Notification Service (para alertas de produto)"
+    ],
+    "guarantees": "At-least-once delivery com idempotency keys",
+    "retentionPolicy": "30 dias de retenção"
+  }
+}
