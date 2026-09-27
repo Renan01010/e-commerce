@@ -1,0 +1,61 @@
+openapi: 3.1.0
+info:
+  title: Contrato de Login do Cliente - TechStore
+  description: Contrato existente consumido pela tela de login; não altera o backend.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: API Gateway local
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Autenticar cliente com e-mail e senha
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciais válidas; token de acesso emitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Request ausente ou inválido.
+        '401':
+          description: Credenciais inválidas; não identifica se e-mail ou senha está incorreto.
+        '5XX':
+          description: Serviço indisponível ou erro de comunicação.
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          minLength: 1
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          format: int64
+          minimum: 1
