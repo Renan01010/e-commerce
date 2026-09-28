@@ -18,6 +18,8 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+    placeholders:
+      categorySlugOverrides: ${CATEGORY_SLUG_OVERRIDES_JSON:}
 
 techstore:
   jwt:

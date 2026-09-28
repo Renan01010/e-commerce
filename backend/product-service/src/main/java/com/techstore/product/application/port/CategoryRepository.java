@@ -10,6 +10,8 @@ public interface CategoryRepository {
     Optional<Category> findActiveById(UUID id);
     boolean existsByName(String name);
     boolean existsByNameAndIdNot(String name, UUID id);
+    boolean existsBySlug(String slug);
+    boolean existsBySlugAndIdNot(String slug, UUID id);
     boolean existsActiveById(UUID id);
     Category save(Category category);
 }
