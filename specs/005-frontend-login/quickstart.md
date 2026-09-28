@@ -42,7 +42,7 @@ Resultado esperado: testes de auth service e componentes aprovados; compilação
 5. Simular Gateway indisponível: mensagem de conexão, formulário continua utilizável e nenhuma sessão é criada.
 6. Enviar credenciais válidas: botão mostra carregamento, não aceita submissão duplicada; token fica disponível na sessão em memória e o navegador vai para `/`.
 7. Recarregar depois de autenticar: o estado volta a não autenticado, conforme decisão desta feature.
-8. Ativar “Criar conta”: navega para `/register`; a tela de cadastro não é implementada por esta feature.
+8. Ativar “Criar conta”: navega para `/register` e exibe “Cadastro indisponível no momento”; confirmar que não há formulário/request de cadastro nem alteração da sessão.
 9. Verificar desktop e viewport de 320 px: sem campos, ações ou mensagens cortados/sobrepostos.
 
 ## Contrato
