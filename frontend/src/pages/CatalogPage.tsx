@@ -27,6 +27,11 @@ export function CatalogPage() {
   const hasMore = useCatalogStore((state) => state.hasMore);
   const isLoading = useCatalogStore((state) => state.isLoading);
   const error = useCatalogStore((state) => state.error);
+  const categoriesError = useCatalogStore((state) => state.categoriesError);
+  const loadProducts = useCatalogStore((state) => state.loadProducts);
+  const loadCategories = useCatalogStore((state) => state.loadCategories);
+  const hasInvalidPriceRange = filters.minPrice !== undefined && filters.maxPrice !== undefined
+    && filters.minPrice > filters.maxPrice;
 
   useEffect(() => {
     const timer = window.setTimeout(() => useCatalogStore.getState().setSearchQuery(searchInput), 250);
@@ -42,8 +47,8 @@ export function CatalogPage() {
   }, [categoryFromUrl]);
 
   useEffect(() => {
-    void useCatalogStore.getState().loadProducts();
-  }, [filters, sortBy, sortOrder, currentPage, useCatalogStore.getState().searchQuery]);
+    if (!hasInvalidPriceRange) void loadProducts();
+  }, [filters, sortBy, sortOrder, currentPage, loadProducts, hasInvalidPriceRange, useCatalogStore.getState().searchQuery]);
 
   const setFilter = useCatalogStore((state) => state.setFilters);
   const clearFilters = useCatalogStore((state) => state.clearFilters);
@@ -120,14 +125,16 @@ export function CatalogPage() {
           </div>
 
           {searchQuery && <p className="search-summary">Resultados para <strong>“{searchQuery}”</strong></p>}
-          {error && <div className="notice notice--error" role="alert">{error}</div>}
+          {hasInvalidPriceRange && <div className="notice notice--error" role="alert">O preço mínimo deve ser menor ou igual ao preço máximo.</div>}
+          {error && <div className="notice notice--error" role="alert">{error} <button type="button" className="text-button" onClick={() => void loadProducts()}>Tentar novamente</button></div>}
+          {categoriesError && <div className="notice notice--error" role="alert">As categorias não puderam ser carregadas. <button type="button" className="text-button" onClick={() => void loadCategories()}>Tentar novamente</button></div>}
           {isLoading ? (
             <div className="loading-grid" aria-label="Carregando produtos">
               {Array.from({ length: 6 }, (_, index) => <div className="skeleton" key={index} />)}
             </div>
           ) : products.length ? (
             <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div>
-          ) : !error ? (
+          ) : !error && !hasInvalidPriceRange ? (
             <div className="empty-state">
               <p className="eyebrow">NENHUM RESULTADO</p>
               <h2>Não encontramos produtos por aqui.</h2>

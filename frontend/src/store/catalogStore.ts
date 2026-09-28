@@ -17,6 +17,7 @@ interface CatalogState {
   hasMore: boolean;
   isLoading: boolean;
   error: string | null;
+  categoriesError: string | null;
   setSearchQuery: (searchQuery: string) => void;
   setFilters: (filters: Partial<CatalogFilters>) => void;
   clearFilters: () => void;
@@ -30,6 +31,10 @@ interface CatalogState {
 const emptyPage: ProductPage = {
   content: [], totalElements: 0, totalPages: 0, currentPage: 0, pageSize: 20, hasMore: false,
 };
+
+let productsRequestId = 0;
+let categoriesRequestId = 0;
+let productRequestId = 0;
 
 export const useCatalogStore = create<CatalogState>((set, get) => ({
   products: [],
@@ -46,12 +51,14 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
   hasMore: false,
   isLoading: false,
   error: null,
+  categoriesError: null,
   setSearchQuery: (searchQuery) => set({ searchQuery, currentPage: 0 }),
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters }, currentPage: 0 })),
   clearFilters: () => set({ filters: {}, currentPage: 0 }),
   setSort: (sortBy, sortOrder) => set({ sortBy, sortOrder, currentPage: 0 }),
   setPage: (currentPage) => set({ currentPage }),
   loadProducts: async () => {
+    const requestId = ++productsRequestId;
     set({ isLoading: true, error: null });
     try {
       const state = get();
@@ -63,26 +70,34 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
         page: state.currentPage,
         pageSize: state.pageSize,
       });
+      if (requestId !== productsRequestId) return;
       set({ products: page.content, totalElements: page.totalElements, totalPages: page.totalPages,
         currentPage: page.currentPage, pageSize: page.pageSize, hasMore: page.hasMore, isLoading: false });
     } catch (error) {
+      if (requestId !== productsRequestId) return;
       set({ ...emptyPage, error: getApiErrorMessage(error), isLoading: false });
     }
   },
   loadCategories: async () => {
+    const requestId = ++categoriesRequestId;
+    set({ categoriesError: null });
     try {
-      set({ categories: await catalogApi.getCategories() });
+      const categories = await catalogApi.getCategories();
+      if (requestId === categoriesRequestId) set({ categories });
     } catch (error) {
-      set({ error: getApiErrorMessage(error) });
+      if (requestId === categoriesRequestId) set({ categoriesError: getApiErrorMessage(error) });
     }
   },
   loadProduct: async (id) => {
+    const requestId = ++productRequestId;
     set({ isLoading: true, error: null, selectedProduct: null });
     try {
       const selectedProduct = await catalogApi.getProduct(id);
+      if (requestId !== productRequestId) return null;
       set({ selectedProduct, isLoading: false });
       return selectedProduct;
     } catch (error) {
+      if (requestId !== productRequestId) return null;
       set({ error: getApiErrorMessage(error), isLoading: false });
       return null;
     }

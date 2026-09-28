@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCatalogStore } from '../store/catalogStore';
 
@@ -14,12 +14,14 @@ function categoryLabel(categoryId: string, categories: ReturnType<typeof useCata
 
 export function ProductDetailPage() {
   const { id = '' } = useParams();
+  const [imageFailed, setImageFailed] = useState(false);
   const product = useCatalogStore((state) => state.selectedProduct);
   const categories = useCatalogStore((state) => state.categories);
   const isLoading = useCatalogStore((state) => state.isLoading);
   const error = useCatalogStore((state) => state.error);
 
   useEffect(() => {
+    setImageFailed(false);
     void useCatalogStore.getState().loadCategories();
     void useCatalogStore.getState().loadProduct(id);
   }, [id]);
@@ -39,7 +41,7 @@ export function ProductDetailPage() {
       </nav>
       <section className="product-detail">
         <div className="product-detail__media">
-          {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <div className="product-detail__image-empty">TECHSTORE</div>}
+          {product.imageUrl && !imageFailed ? <img src={product.imageUrl} alt={product.name} onError={() => setImageFailed(true)} /> : <div className="product-detail__image-empty">TECHSTORE</div>}
         </div>
         <div className="product-detail__content">
           <p className="eyebrow">{product.brand || 'TECHSTORE'} / {product.sku}</p>
