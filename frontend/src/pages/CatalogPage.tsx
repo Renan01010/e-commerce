@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Filter, Search, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ProductCard } from '../components/ProductCard';
 import { useCatalogStore } from '../store/catalogStore';
@@ -16,6 +17,7 @@ export function CatalogPage() {
   const [searchParams] = useSearchParams();
   const categoryFromUrl = searchParams.get('categoryId');
   const [searchInput, setSearchInput] = useState(useCatalogStore.getState().searchQuery);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const products = useCatalogStore((state) => state.products);
   const categories = useCatalogStore((state) => state.categories);
   const filters = useCatalogStore((state) => state.filters);
@@ -30,8 +32,11 @@ export function CatalogPage() {
   const categoriesError = useCatalogStore((state) => state.categoriesError);
   const loadProducts = useCatalogStore((state) => state.loadProducts);
   const loadCategories = useCatalogStore((state) => state.loadCategories);
+  const searchQuery = useCatalogStore((state) => state.searchQuery);
   const hasInvalidPriceRange = filters.minPrice !== undefined && filters.maxPrice !== undefined
     && filters.minPrice > filters.maxPrice;
+  const productCount = totalElements ?? 0;
+  const featuredProduct = products[0];
 
   useEffect(() => {
     const timer = window.setTimeout(() => useCatalogStore.getState().setSearchQuery(searchInput), 250);
@@ -48,14 +53,12 @@ export function CatalogPage() {
 
   useEffect(() => {
     if (!hasInvalidPriceRange) void loadProducts();
-  }, [filters, sortBy, sortOrder, currentPage, loadProducts, hasInvalidPriceRange, useCatalogStore.getState().searchQuery]);
+  }, [filters, sortBy, sortOrder, currentPage, loadProducts, hasInvalidPriceRange, searchQuery]);
 
   const setFilter = useCatalogStore((state) => state.setFilters);
   const clearFilters = useCatalogStore((state) => state.clearFilters);
   const setSort = useCatalogStore((state) => state.setSort);
   const setPage = useCatalogStore((state) => state.setPage);
-  const searchQuery = useCatalogStore((state) => state.searchQuery);
-
   const handleSort = (value: string) => {
     const [nextSort, nextOrder] = value.split('-') as [ProductSort, SortOrder];
     setSort(nextSort, nextOrder);
@@ -63,19 +66,38 @@ export function CatalogPage() {
 
   return (
     <main className="catalog-shell">
-      <section className="catalog-heading">
-        <div>
-          <p className="eyebrow">TECHSTORE / CATÁLOGO</p>
-          <h1>Encontre seu próximo favorito.</h1>
+      <section className="catalog-hero">
+        <div className="catalog-hero__copy">
+          <nav className="breadcrumbs" aria-label="Navegação estrutural"><span>TechStore</span><span aria-hidden="true">/</span><strong>Catálogo</strong></nav>
+          <p className="eyebrow">TECNOLOGIA PARA O SEU DIA</p>
+          <h1>Encontre algo que acompanhe seu ritmo.</h1>
+          <p className="catalog-hero__subtitle">Peças inteligentes, design preciso e tudo para deixar sua rotina mais interessante.</p>
         </div>
-        <p className="catalog-count">{totalElements.toLocaleString('pt-BR')} produtos</p>
+        <div className="catalog-hero__feature" aria-label="Destaque do catálogo">
+          {featuredProduct?.imageUrl ? <img src={featuredProduct.imageUrl} alt="" /> : <div className="catalog-hero__feature-empty">TECHSTORE<br /><span>CATÁLOGO</span></div>}
+          {featuredProduct && <div className="catalog-hero__feature-copy"><p className="eyebrow">EM DESTAQUE</p><strong>{featuredProduct.name}</strong><Link to={`/products/${featuredProduct.id}`}>Ver produto <span aria-hidden="true">↗</span></Link></div>}
+        </div>
+        <label className="hero-search">
+          <Search size={20} strokeWidth={1.8} aria-hidden="true" />
+          <span className="sr-only">Buscar produtos</span>
+          <input type="search" aria-label="Buscar produtos" placeholder="Busque por produto, marca ou descrição"
+            value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
+          {searchInput && <button type="button" aria-label="Limpar busca" onClick={() => setSearchInput('')}><X size={17} aria-hidden="true" /></button>}
+        </label>
+        <div className="category-chips" id="catalog-categories" aria-label="Categorias em destaque">
+          {categories.slice(0, 5).map((category) => <Link key={category.id} to={`/?categoryId=${category.id}`} className="category-chip">{category.name}</Link>)}
+        </div>
       </section>
 
+      <button className="filter-trigger" type="button" aria-expanded={filtersOpen} aria-controls="catalog-filters" onClick={() => setFiltersOpen(true)}>
+        <Filter size={16} aria-hidden="true" /> Filtros
+      </button>
       <div className="catalog-layout">
-        <aside className="filters" aria-label="Filtros do catálogo">
+        {filtersOpen && <button className="filter-backdrop" type="button" aria-label="Fechar painel de filtros" onClick={() => setFiltersOpen(false)} />}
+        <aside className={`filters${filtersOpen ? ' filters--open' : ''}`} id="catalog-filters" aria-label="Filtros do catálogo">
           <div className="filters__heading">
-            <h2>Refinar</h2>
-            <button type="button" className="text-button" onClick={clearFilters}>Limpar</button>
+            <div><p className="eyebrow">EXPLORAR</p><h2>Refinar</h2></div>
+            <div className="filters__actions"><button type="button" className="text-button" onClick={clearFilters}>Limpar</button><button type="button" className="filter-close" aria-label="Fechar filtros" onClick={() => setFiltersOpen(false)}><X size={18} aria-hidden="true" /></button></div>
           </div>
           <label className="filter-label" htmlFor="category-filter">Categoria</label>
           <select id="category-filter" value={filters.categoryId ?? ''}
@@ -103,16 +125,12 @@ export function CatalogPage() {
               onChange={(event) => setFilter({ inStock: event.target.checked ? true : undefined })} />
             <span>Somente disponíveis</span>
           </label>
+          <div className="filter-drawer-actions"><button type="button" className="button button--primary" onClick={() => setFiltersOpen(false)}>Aplicar filtros</button></div>
         </aside>
 
-        <section className="catalog-results" aria-label="Produtos">
+        <section className="catalog-results" id="catalog-products" aria-label="Produtos">
           <div className="catalog-toolbar">
-            <label className="search-box">
-              <span className="search-box__icon" aria-hidden="true">⌕</span>
-              <input type="search" aria-label="Buscar produtos" placeholder="Busque por produto, marca ou descrição"
-                value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
-              {searchInput && <button type="button" aria-label="Limpar busca" onClick={() => setSearchInput('')}>×</button>}
-            </label>
+            <div><p className="eyebrow">CATÁLOGO</p><p className="catalog-count"><strong>{productCount.toLocaleString('pt-BR')}</strong> produtos encontrados</p></div>
             <label className="sort-control">Ordenar
               <select aria-label="Ordenar produtos" value={`${sortBy}-${sortOrder}`} onChange={(event) => handleSort(event.target.value)}>
                 <option value="relevance-desc">Relevância</option>
@@ -133,7 +151,7 @@ export function CatalogPage() {
               {Array.from({ length: 6 }, (_, index) => <div className="skeleton" key={index} />)}
             </div>
           ) : products.length ? (
-            <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+            <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} categoryName={categoryLabel(product.categoryId, categories)} />)}</div>
           ) : !error && !hasInvalidPriceRange ? (
             <div className="empty-state">
               <p className="eyebrow">NENHUM RESULTADO</p>

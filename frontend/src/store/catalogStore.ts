@@ -61,18 +61,20 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
     const requestId = ++productsRequestId;
     set({ isLoading: true, error: null });
     try {
-      const state = get();
+      const requestState = get();
       const page = await catalogApi.getProducts({
-        query: state.searchQuery,
-        filters: state.filters,
-        sortBy: state.sortBy,
-        sortOrder: state.sortOrder,
-        page: state.currentPage,
-        pageSize: state.pageSize,
+        query: requestState.searchQuery,
+        filters: requestState.filters,
+        sortBy: requestState.sortBy,
+        sortOrder: requestState.sortOrder,
+        page: requestState.currentPage,
+        pageSize: requestState.pageSize,
       });
       if (requestId !== productsRequestId) return;
-      set({ products: page.content, totalElements: page.totalElements, totalPages: page.totalPages,
-        currentPage: page.currentPage, pageSize: page.pageSize, hasMore: page.hasMore, isLoading: false });
+      const currentState = get();
+      set({ products: page.content ?? [], totalElements: page.totalElements ?? 0, totalPages: page.totalPages ?? 0,
+        currentPage: page.currentPage ?? currentState.currentPage, pageSize: page.pageSize ?? currentState.pageSize,
+        hasMore: page.hasMore ?? false, isLoading: false });
     } catch (error) {
       if (requestId !== productsRequestId) return;
       set({ ...emptyPage, error: getApiErrorMessage(error), isLoading: false });

@@ -4,11 +4,12 @@ import type { Product } from '../types/catalog';
 
 interface ProductCardProps {
   product: Product;
+  categoryName?: string;
 }
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, categoryName }: ProductCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
@@ -26,12 +27,12 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
         <div className="product-card__body">
           <div className="product-card__meta">
-            <span>{product.brand || 'TechStore'}</span>
+            <span>{categoryName || product.brand || 'TechStore'}</span>
             <span>{product.sku}</span>
           </div>
           <h2>{product.name}</h2>
-          <p>{product.description || 'Veja os detalhes deste produto.'}</p>
-          <strong>{currency.format(product.price)}</strong>
+          <p className="product-card__description">{product.description || 'Veja os detalhes deste produto.'}</p>
+          <div className="product-card__price-row"><strong>{currency.format(product.price)}</strong><span className="product-card__arrow" aria-hidden="true">↗</span></div>
         </div>
       </Link>
     </article>

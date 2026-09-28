@@ -40,16 +40,25 @@ export const catalogApi = {
         pageSize: input.pageSize,
       },
     });
+    if (!data || typeof data !== 'object' || !Array.isArray(data.content)) {
+      throw new Error('Resposta inválida do catálogo');
+    }
     return data;
   },
 
   async getProduct(id: string): Promise<Product> {
     const { data } = await apiClient.get<Product>(`/products/${id}`);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Resposta inválida do produto');
+    }
     return data;
   },
 
   async getCategories(): Promise<Category[]> {
     const { data } = await apiClient.get<Category[]>('/categories');
+    if (!Array.isArray(data)) {
+      throw new Error('Resposta inválida das categorias');
+    }
     return data;
   },
 };
@@ -60,5 +69,5 @@ export function getApiErrorMessage(error: unknown): string {
     const message = (error.response.data as { message?: string } | undefined)?.message;
     return message ?? 'O catálogo não pôde ser carregado.';
   }
-  return 'Ocorreu um erro inesperado.';
+  return 'O catálogo não pôde ser carregado.';
 }
