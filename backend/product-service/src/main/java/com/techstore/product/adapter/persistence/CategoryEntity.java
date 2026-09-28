@@ -15,6 +15,8 @@ public class CategoryEntity {
     private UUID id;
     @Column(nullable = false, unique = true, length = 100)
     private String name;
+    @Column(nullable = false, unique = true, length = 120)
+    private String slug;
     @Column(length = 500)
     private String description;
     @Column(name = "parent_category_id")
@@ -38,6 +40,7 @@ public class CategoryEntity {
         CategoryEntity entity = new CategoryEntity();
         entity.id = category.id();
         entity.name = category.name();
+        entity.slug = category.slug();
         entity.description = category.description();
         entity.parentCategoryId = category.parentCategoryId();
         entity.displayOrder = category.displayOrder();
@@ -50,7 +53,7 @@ public class CategoryEntity {
     }
 
     public Category toDomain() {
-        return new Category(id, name, description, parentCategoryId, displayOrder,
+        return new Category(id, name, slug, description, parentCategoryId, displayOrder,
                 active, createdAt, updatedAt, createdBy, updatedBy);
     }
 }

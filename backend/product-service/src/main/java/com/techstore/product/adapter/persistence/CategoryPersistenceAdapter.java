@@ -21,6 +21,8 @@ public class CategoryPersistenceAdapter implements CategoryRepository {
     }
     @Override public boolean existsByName(String name) { return repository.existsByName(name); }
     @Override public boolean existsByNameAndIdNot(String name, UUID id) { return repository.existsByNameAndIdNot(name, id); }
+    @Override public boolean existsBySlug(String slug) { return repository.existsBySlug(slug); }
+    @Override public boolean existsBySlugAndIdNot(String slug, UUID id) { return repository.existsBySlugAndIdNot(slug, id); }
     @Override public boolean existsActiveById(UUID id) { return repository.existsByIdAndActiveTrue(id); }
     @Override public Category save(Category category) { return repository.save(CategoryEntity.from(category)).toDomain(); }
 }
