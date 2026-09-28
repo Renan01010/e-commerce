@@ -50,7 +50,9 @@ class CartItemControllerTest {
 
         mockMvc.perform(post("/api/cart/items").with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
                         .contentType(APPLICATION_JSON)
-                        .content("""{"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":2}"""))
+                        .content("""
+                                {"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":2}
+                                """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.items[0].quantity").value(2));
     }
@@ -62,7 +64,9 @@ class CartItemControllerTest {
 
         mockMvc.perform(post("/api/cart/items").with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
                         .contentType(APPLICATION_JSON)
-                        .content("""{"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":2}"""))
+                        .content("""
+                                {"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":2}
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(5));
     }
@@ -71,12 +75,16 @@ class CartItemControllerTest {
     void rejectsUnknownOwnerFieldAndInvalidQuantity() throws Exception {
         mockMvc.perform(post("/api/cart/items").with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
                         .contentType(APPLICATION_JSON)
-                        .content("""{"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":1,"userId":"550e8400-e29b-41d4-a716-446655440010"}"""))
+                        .content("""
+                                {"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":1,"userId":"550e8400-e29b-41d4-a716-446655440010"}
+                                """))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(put("/api/cart/items/{productId}", PRODUCT_ID)
                         .with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
                         .contentType(APPLICATION_JSON)
-                        .content("""{"quantity":0}"""))
+                        .content("""
+                                {"quantity":0}
+                                """))
                 .andExpect(status().isBadRequest());
     }
 
@@ -86,7 +94,9 @@ class CartItemControllerTest {
 
         mockMvc.perform(put("/api/cart/items/{productId}", PRODUCT_ID)
                         .with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
-                        .contentType(APPLICATION_JSON).content("""{"quantity":4}"""))
+                        .contentType(APPLICATION_JSON).content("""
+                                {"quantity":4}
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(4));
 
@@ -99,7 +109,9 @@ class CartItemControllerTest {
     @Test
     void requiresAuthentication() throws Exception {
         mockMvc.perform(post("/api/cart/items").contentType(APPLICATION_JSON)
-                        .content("""{"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":1}"""))
+                        .content("""
+                                {"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":1}
+                                """))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import type { AddCartItemRequest, CartResponse } from '../types/cart';
 import type { CatalogFilters, Category, Product, ProductPage, ProductSort, SortOrder } from '../types/catalog';
 
 export const apiClient = axios.create({
@@ -60,6 +61,71 @@ export const catalogApi = {
       throw new Error('Resposta inválida das categorias');
     }
     return data;
+  },
+};
+
+export type CartApiErrorKind = 'unauthenticated' | 'not-found' | 'unavailable' | 'network' | 'unknown';
+
+export class CartApiError extends Error {
+  constructor(
+    message: string,
+    readonly kind: CartApiErrorKind,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'CartApiError';
+  }
+}
+
+function toCartApiError(error: unknown): CartApiError {
+  if (!axios.isAxiosError(error)) {
+    return new CartApiError('O carrinho não pôde ser atualizado.', 'unknown');
+  }
+
+  const status = error.response?.status;
+  if (status === 401) {
+    return new CartApiError('Entre na sua conta para acessar o carrinho.', 'unauthenticated', status);
+  }
+  if (status === 404) {
+    return new CartApiError('Este item não está mais disponível no carrinho.', 'not-found', status);
+  }
+  if (status === 503) {
+    return new CartApiError('O carrinho está temporariamente indisponível. Tente novamente.', 'unavailable', status);
+  }
+  if (!error.response) {
+    return new CartApiError('Não foi possível conectar ao carrinho. Tente novamente.', 'network');
+  }
+  return new CartApiError('O carrinho não pôde ser atualizado. Tente novamente.', 'unknown', status);
+}
+
+async function requestCart<T>(request: () => Promise<{ data: T }>): Promise<T> {
+  try {
+    const response = await request();
+    return response.data;
+  } catch (error) {
+    throw toCartApiError(error);
+  }
+}
+
+export const cartApi = {
+  getCart(): Promise<CartResponse> {
+    return requestCart(() => apiClient.get<CartResponse>('/cart'));
+  },
+
+  addItem(body: AddCartItemRequest): Promise<CartResponse> {
+    return requestCart(() => apiClient.post<CartResponse>('/cart/items', body));
+  },
+
+  setQuantity(productId: string, quantity: number): Promise<CartResponse> {
+    return requestCart(() => apiClient.put<CartResponse>(`/cart/items/${encodeURIComponent(productId)}`, { quantity }));
+  },
+
+  removeItem(productId: string): Promise<void> {
+    return requestCart(() => apiClient.delete<void>(`/cart/items/${encodeURIComponent(productId)}`));
+  },
+
+  clearCart(): Promise<void> {
+    return requestCart(() => apiClient.delete<void>('/cart'));
   },
 };
 
