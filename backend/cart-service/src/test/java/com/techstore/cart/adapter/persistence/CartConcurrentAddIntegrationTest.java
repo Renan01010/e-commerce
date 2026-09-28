@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.techstore.cart.application.port.out.CartStorePort;
 import com.techstore.cart.domain.CartItem;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -47,15 +48,16 @@ class CartConcurrentAddIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(WORKERS);
         try {
-            List<Future<?>> futures = java.util.stream.IntStream.range(0, WORKERS)
-                    .mapToObj(worker -> executor.submit(() -> {
+            List<Future<?>> futures = new ArrayList<>(WORKERS);
+            for (int worker = 0; worker < WORKERS; worker++) {
+                futures.add(executor.submit(() -> {
                         start.await();
                         for (int add = 0; add < ADDS_PER_WORKER; add++) {
                             cartStore.add(ownerUserId, productId, 1);
                         }
                         return null;
-                    }))
-                    .toList();
+                    }));
+            }
             start.countDown();
             for (Future<?> future : futures) future.get(Duration.ofSeconds(20).toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
 
