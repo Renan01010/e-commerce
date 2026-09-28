@@ -54,12 +54,12 @@ Como visitante sem conta, quero encontrar a navegação para criação de conta 
 
 **Why this priority**: A navegação evita bloquear novos clientes, enquanto a implementação do cadastro pertence a uma feature separada.
 
-**Independent Test**: Abrir a tela de login, navegar por teclado até o link de criação de conta e ativá-lo; confirmar que ele aponta para a rota reservada ao futuro cadastro sem criar conta ou simular sucesso nesta feature.
+**Independent Test**: Abrir a tela de login, navegar por teclado até o link de criação de conta e ativá-lo; confirmar que `/register` apresenta um estado informativo não funcional, sem formulário, request de cadastro ou alteração da sessão.
 
 **Acceptance Scenarios**:
 
-1. **Given** a tela de login aberta, **When** o visitante ativar “Criar conta”, **Then** a aplicação navega para a rota futura de cadastro.
-2. **Given** o destino de cadastro ainda não foi entregue, **When** esta feature for implementada isoladamente, **Then** o login não apresenta um fluxo de cadastro fictício nem afirma que uma conta foi criada.
+1. **Given** a tela de login aberta, **When** o visitante ativar “Criar conta”, **Then** a aplicação navega para `/register`.
+2. **Given** a funcionalidade de cadastro ainda não foi entregue, **When** o visitante acessar `/register`, **Then** a aplicação exibe um estado informativo “Cadastro indisponível no momento”, sem formulário, request de cadastro ou alteração da sessão autenticada.
 
 ### Edge Cases
 
@@ -132,7 +132,7 @@ O serviço de autenticação é a autoridade para validar credenciais e emitir t
 
 - O endpoint `POST /api/auth/login` e seu emissor JWT já existem e são disponibilizados pelo API Gateway; esta feature não os cria nem os altera.
 - A branch atual não contém um estado de autenticação frontend existente; esta feature estabelece o estado de sessão em memória para uso entre rotas.
-- O link “Criar conta” aponta para `/register`, destino reservado à feature futura; esta feature não cria a tela nem implementa cadastro.
+- O link “Criar conta” aponta para `/register`; esta feature cria somente um placeholder informativo nessa rota, sem formulário, serviço ou persistência de cadastro.
 - A imagem anexada é a referência visual primária desta tela. A composição usa hero fotográfico de tecnologia com marca, chamada e benefícios à esquerda, e formulário navy à direita; no mobile, o formulário tem prioridade visual.
 - O protótipo também mostra recuperação de senha e login Google, mas esses fluxos não foram solicitados e não serão simulados nem incluídos sem contratos próprios.
 - Nesta feature, a identidade navy/azul aplica-se somente ao login; a paleta existente do catálogo permanece inalterada e telas futuras poderão adotar a nova direção em features próprias.

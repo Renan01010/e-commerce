@@ -1,9 +1,18 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 import type { CatalogFilters, Category, Product, ProductPage, ProductSort, SortOrder } from '../types/catalog';
 
-const http = axios.create({
+export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
   timeout: Number(import.meta.env.VITE_API_TIMEOUT ?? 10000),
+});
+
+apiClient.interceptors.request.use((config) => {
+  if (config.url !== '/auth/login') {
+    const session = useAuthStore.getState().getValidSession();
+    if (session) config.headers.set('Authorization', `${session.tokenType} ${session.accessToken}`);
+  }
+  return config;
 });
 
 export interface ProductQuery {
@@ -17,7 +26,7 @@ export interface ProductQuery {
 
 export const catalogApi = {
   async getProducts(input: ProductQuery): Promise<ProductPage> {
-    const { data } = await http.get<ProductPage>('/products', {
+    const { data } = await apiClient.get<ProductPage>('/products', {
       params: {
         query: input.query || undefined,
         categoryId: input.filters.categoryId,
@@ -35,12 +44,12 @@ export const catalogApi = {
   },
 
   async getProduct(id: string): Promise<Product> {
-    const { data } = await http.get<Product>(`/products/${id}`);
+    const { data } = await apiClient.get<Product>(`/products/${id}`);
     return data;
   },
 
   async getCategories(): Promise<Category[]> {
-    const { data } = await http.get<Category[]>('/categories');
+    const { data } = await apiClient.get<Category[]>('/categories');
     return data;
   },
 };
