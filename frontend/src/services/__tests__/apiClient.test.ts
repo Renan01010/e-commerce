@@ -78,3 +78,69 @@ describe('catalogApi', () => {
     });
   });
 });
+
+describe('cartApi', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('loads the authenticated cart from the gateway path', async () => {
+    const response = { items: [] };
+    const request = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: response } as never);
+
+    await expect((await import('../apiClient')).cartApi.getCart()).resolves.toEqual(response);
+    expect(request).toHaveBeenCalledWith('/cart');
+  });
+
+  it.each([200, 201])('accepts POST success status %i and sends only product and quantity', async (status) => {
+    const response = { items: [] };
+    const request = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: response, status } as never);
+    const body = { productId: 'product-1', quantity: 2 };
+
+    await expect((await import('../apiClient')).cartApi.addItem(body)).resolves.toEqual(response);
+    expect(request).toHaveBeenCalledWith('/cart/items', body);
+  });
+
+  it('replaces quantity through the product-specific gateway path', async () => {
+    const response = { items: [] };
+    const request = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: response } as never);
+
+    await expect((await import('../apiClient')).cartApi.setQuantity('product-1', 4)).resolves.toEqual(response);
+    expect(request).toHaveBeenCalledWith('/cart/items/product-1', { quantity: 4 });
+  });
+
+  it('treats item and cart DELETE 204 responses as bodyless success', async () => {
+    const request = vi.spyOn(apiClient, 'delete').mockResolvedValue({ data: undefined, status: 204 } as never);
+    const { cartApi } = await import('../apiClient');
+
+    await expect(cartApi.removeItem('product-1')).resolves.toBeUndefined();
+    await expect(cartApi.clearCart()).resolves.toBeUndefined();
+    expect(request).toHaveBeenNthCalledWith(1, '/cart/items/product-1');
+    expect(request).toHaveBeenNthCalledWith(2, '/cart');
+  });
+
+  it.each([
+    [401, 'unauthenticated'],
+    [404, 'not-found'],
+    [503, 'unavailable'],
+  ] as const)('classifies cart HTTP error %i without changing catalog errors', async (status, kind) => {
+    const requestError = Object.assign(new Error('backend detail'), {
+      isAxiosError: true,
+      response: { status, data: { message: 'backend detail' } },
+    });
+    vi.spyOn(apiClient, 'get').mockRejectedValue(requestError);
+    const { CartApiError, cartApi, getApiErrorMessage } = await import('../apiClient');
+
+    await expect(cartApi.getCart()).rejects.toMatchObject({
+      name: CartApiError.name,
+      kind,
+      status,
+    });
+    expect(getApiErrorMessage(requestError)).toBe('backend detail');
+  });
+
+  it('classifies a network failure as retryable cart unavailability', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(Object.assign(new Error('offline'), { isAxiosError: true }));
+    const { cartApi } = await import('../apiClient');
+
+    await expect(cartApi.getCart()).rejects.toMatchObject({ kind: 'network' });
+  });
+});

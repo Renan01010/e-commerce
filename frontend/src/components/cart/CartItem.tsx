@@ -1,0 +1,89 @@
+import { useState } from 'react';
+import { AlertCircle, ImageOff, Minus, Plus, Trash2 } from 'lucide-react';
+import type { CartItem as CartItemData } from '../../types/cart';
+
+interface CartItemProps {
+  item: CartItemData;
+  pending: boolean;
+  onQuantityChange: (productId: string, quantity: number) => void;
+  onRemove: (productId: string) => void;
+}
+
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export function CartItem({ item, pending, onQuantityChange, onRemove }: CartItemProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const product = item.product;
+  const unavailable = !item.available || !product;
+  const label = product?.name ?? 'Produto indisponível';
+
+  return (
+    <article className={`cart-item${unavailable ? ' cart-item--unavailable' : ''}`}>
+      <div className="cart-item__media">
+        {!unavailable && product.imageUrl && !imageFailed ? (
+          <img src={product.imageUrl} alt={product.name} onError={() => setImageFailed(true)} />
+        ) : (
+          <div className="cart-item__image-empty" aria-label={unavailable ? 'Produto indisponível' : 'Imagem indisponível'}>
+            {unavailable ? <AlertCircle size={22} aria-hidden="true" /> : <ImageOff size={22} aria-hidden="true" />}
+          </div>
+        )}
+      </div>
+
+      <div className="cart-item__details">
+        <span className={`cart-item__availability${unavailable ? ' cart-item__availability--unavailable' : ''}`}>
+          {unavailable ? 'Indisponível' : 'Disponível'}
+        </span>
+        <h2>{label}</h2>
+        {unavailable ? (
+          <>
+            <p className="cart-item__identifier">{item.productId}</p>
+            <div className="cart-item__warning" role="status">
+              <AlertCircle size={16} aria-hidden="true" />
+              <span>Este produto não está mais disponível. Você pode removê-lo do carrinho.</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {product.brand && <p className="cart-item__brand">{product.brand}</p>}
+            <p className="cart-item__identifier">{item.productId}</p>
+          </>
+        )}
+      </div>
+
+      <div className="cart-item__actions">
+        {!unavailable && <strong className="cart-item__price">{currency.format(product.price)}</strong>}
+        {!unavailable && (
+          <div className="cart-quantity" role="group" aria-label={`Controles de quantidade de ${product.name}`}>
+            <button
+              type="button"
+              aria-label={`Diminuir quantidade de ${product.name}`}
+              disabled={pending || item.quantity <= 1}
+              onClick={() => onQuantityChange(item.productId, item.quantity - 1)}
+            >
+              <Minus size={15} aria-hidden="true" />
+            </button>
+            <input aria-label={`Quantidade de ${product.name}`} type="number" min="1" max="2147483647" value={item.quantity} readOnly />
+            <button
+              type="button"
+              aria-label={`Aumentar quantidade de ${product.name}`}
+              disabled={pending || item.quantity >= 2_147_483_647}
+              onClick={() => onQuantityChange(item.productId, item.quantity + 1)}
+            >
+              <Plus size={15} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        <button
+          className="cart-item__remove"
+          type="button"
+          aria-label={`Remover ${label}`}
+          disabled={pending}
+          onClick={() => onRemove(item.productId)}
+        >
+          <Trash2 size={16} aria-hidden="true" />
+          <span>{pending ? 'Aguarde…' : 'Remover'}</span>
+        </button>
+      </div>
+    </article>
+  );
+}

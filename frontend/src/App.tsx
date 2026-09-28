@@ -1,10 +1,13 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Menu, ShoppingBag, UserRound, X } from 'lucide-react';
 import { Link, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { CatalogPage } from './pages/CatalogPage';
+import { CartPage } from './pages/CartPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { RegisterUnavailablePage } from './pages/RegisterUnavailablePage';
+import { useAuthStore } from './store/authStore';
+import { useCartStore } from './store/cartStore';
 
 export default function App() {
   return (
@@ -13,6 +16,7 @@ export default function App() {
       <Route path="/register" element={<RegisterUnavailablePage />} />
       <Route path="/" element={<StoreLayout><CatalogPage /></StoreLayout>} />
       <Route path="/products/:id" element={<StoreLayout><ProductDetailPage /></StoreLayout>} />
+      <Route path="/cart" element={<StoreLayout><CartPage /></StoreLayout>} />
       <Route path="*" element={<StoreLayout><main className="detail-state"><h1>Página não encontrada</h1><Link className="button button--outline" to="/">Ir ao catálogo</Link></main></StoreLayout>} />
     </Routes>
   );
@@ -20,6 +24,16 @@ export default function App() {
 
 function StoreLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const session = useAuthStore((state) => state.session);
+  const items = useCartStore((state) => state.items);
+  const cartStatus = useCartStore((state) => state.status);
+  const loadCart = useCartStore((state) => state.loadCart);
+  const cartUnits = items.reduce((sum, item) => sum + item.quantity, 0);
+  const hasConfirmedCart = Boolean(session && session.expiresAt > Date.now() && cartStatus === 'loaded');
+
+  useEffect(() => {
+    if (session && session.expiresAt > Date.now()) void loadCart();
+  }, [session, loadCart]);
 
   return (
     <div className="app-frame">
@@ -36,10 +50,10 @@ function StoreLayout({ children }: { children: ReactNode }) {
           <Link className="header-action" to="/login" aria-label="Acessar minha conta">
             <UserRound size={17} strokeWidth={1.8} aria-hidden="true" /><span>Conta</span>
           </Link>
-          <button className="header-action header-action--muted" type="button" aria-disabled="true" aria-label="Carrinho indisponível" title="Carrinho em breve">
+          <Link className="header-action header-cart" to="/cart" aria-label={hasConfirmedCart ? `Carrinho, ${cartUnits} ${cartUnits === 1 ? 'unidade' : 'unidades'}` : 'Carrinho'}>
             <ShoppingBag size={17} strokeWidth={1.8} aria-hidden="true" /><span>Carrinho</span>
-            <small aria-hidden="true">0</small>
-          </button>
+            {hasConfirmedCart && <small aria-hidden="true">{cartUnits}</small>}
+          </Link>
           <button className="mobile-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="main-navigation" aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'} onClick={() => setMenuOpen((open) => !open)}>
             {menuOpen ? <X size={19} aria-hidden="true" /> : <Menu size={19} aria-hidden="true" />}
           </button>
