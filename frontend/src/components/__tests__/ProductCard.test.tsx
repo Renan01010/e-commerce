@@ -14,7 +14,7 @@ describe('ProductCard', () => {
   it('shows product details and links to its page', () => {
     render(<MemoryRouter><ProductCard product={product} /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Fone Studio' })).toBeInTheDocument();
-    expect(screen.getByText('R$ 399,90')).toBeInTheDocument();
+    expect(screen.getByText((text) => text.replace(/\s/g, ' ') === 'R$ 399,90')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver Fone Studio' })).toHaveAttribute('href', '/products/p-1');
     expect(screen.getByText('Disponível')).toBeInTheDocument();
   });
