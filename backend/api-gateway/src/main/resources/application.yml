@@ -8,7 +8,7 @@ spring:
     gateway:
       routes:
         - id: product-service
-          uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8080}
           predicates:
             - Path=/api/products/**,/api/categories/**
         - id: cart-service
