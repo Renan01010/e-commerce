@@ -58,11 +58,11 @@ public final class ApiModels {
         }
     }
 
-    public record CategoryResponse(UUID id, String name, String description, UUID parentCategoryId,
+    public record CategoryResponse(UUID id, String name, String slug, String description, UUID parentCategoryId,
                                    int displayOrder, boolean isActive,
                                    LocalDateTime createdAt, LocalDateTime updatedAt) {
         public static CategoryResponse from(Category category) {
-            return new CategoryResponse(category.id(), category.name(), category.description(),
+            return new CategoryResponse(category.id(), category.name(), category.slug(), category.description(),
                     category.parentCategoryId(), category.displayOrder(), category.active(),
                     category.createdAt(), category.updatedAt());
         }

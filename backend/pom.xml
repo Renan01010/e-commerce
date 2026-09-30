@@ -9,6 +9,8 @@
 
     <modules>
         <module>product-service</module>
+        <module>cart-service</module>
+        <module>user-service</module>
         <module>api-gateway</module>
     </modules>
 
