@@ -24,8 +24,6 @@ spring:
 techstore:
   jwt:
     secret: ${TECHSTORE_JWT_SECRET:}
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 management:
   endpoints:
