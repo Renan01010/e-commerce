@@ -3,7 +3,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
-ARG VITE_API_URL=http://localhost:8080/api
+ARG VITE_API_URL=https://e-commerce-production-8b39.up.railway.app/api
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 

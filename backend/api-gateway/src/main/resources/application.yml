@@ -24,8 +24,8 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
-            allowedMethods: GET,POST,PUT,DELETE,OPTIONS
+            allowedOrigins: ${CORS_ALLOWED_ORIGINS:https://e-commerce-production-61ac.up.railway.app}
+            allowedMethods: GET,POST,PUT,PATCH,DELETE,OPTIONS
             allowedHeaders: Authorization,Content-Type,X-Correlation-ID
             exposedHeaders: X-Correlation-ID
             allowCredentials: false
