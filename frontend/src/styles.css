@@ -194,6 +194,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cart-item__warning svg { flex: 0 0 auto; }
 .cart-item__actions { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 12px; }
 .cart-item__price { color: var(--ink); font: 600 16px var(--display); white-space: nowrap; }
+.cart-item__price small { color: var(--muted); font: 400 10px var(--body); }
 .cart-item__subtotal { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .cart-quantity { display: inline-flex; min-height: 34px; align-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--white); }
 .cart-quantity button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; color: var(--ink); background: transparent; }
@@ -214,6 +215,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cart-summary-total { display: grid; gap: 6px; padding: 16px 2px; color: var(--ink); font-size: 13px; }
 .cart-summary-total strong { font: 600 20px var(--display); }
 .cart-summary-total p { margin: 0; color: #963b35; font-size: 12px; line-height: 1.45; }
+.cart-summary-total p.cart-summary-total__pending { color: var(--muted); }
 .cart-continue, .cart-clear-secondary { display: flex; width: 100%; min-width: 0; gap: 8px; margin-top: 13px; }
 .cart-continue { border-color: #155c42; background: #155c42; }
 .cart-continue:hover { border-color: #104a35; background: #104a35; }

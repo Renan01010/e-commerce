@@ -12,6 +12,7 @@ interface CartState {
   totalAvailable: boolean;
   status: CartStatus;
   error: string | null;
+  summaryRefreshError: string | null;
   successMessage: string | null;
   pendingOperations: Record<string, boolean>;
   loadCart: () => Promise<void>;
@@ -19,6 +20,7 @@ interface CartState {
   setQuantity: (productId: string, quantity: number) => Promise<boolean>;
   removeItem: (productId: string) => Promise<boolean>;
   clearCart: () => Promise<boolean>;
+  retrySummary: () => Promise<void>;
   dismissFeedback: () => void;
 }
 
@@ -37,16 +39,6 @@ const positiveCartQuantity = (quantity: number, maximum: number) => Number.isInt
   && quantity > 0
   && quantity <= maximum;
 
-function totalForItems(items: CartItem[]) {
-  if (items.some((item) => !item.priceAvailable || item.subtotal === null)) {
-    return { total: null, totalAvailable: false };
-  }
-  return {
-    total: items.reduce((total, item) => total + (item.subtotal ?? 0), 0),
-    totalAvailable: true,
-  };
-}
-
 function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : 'O carrinho não pôde ser atualizado. Tente novamente.';
 }
@@ -62,10 +54,11 @@ function resetForSession(session: typeof activeSession) {
   useCartStore.setState({
     items: [],
     maxItemQuantity: 99,
-    total: 0,
-    totalAvailable: true,
+    total: null,
+    totalAvailable: false,
     status: 'idle',
     error: null,
+    summaryRefreshError: null,
     successMessage: null,
     pendingOperations: {},
   });
@@ -106,6 +99,7 @@ async function runMutation(
   const previousStatus = useCartStore.getState().status;
   useCartStore.setState((state) => ({
     error: null,
+    summaryRefreshError: null,
     successMessage: null,
     pendingOperations: { ...state.pendingOperations, [operationKey]: true },
   }));
@@ -124,12 +118,17 @@ async function runMutation(
             total: cartResponse.total,
             totalAvailable: cartResponse.totalAvailable,
           }
-          : { maxItemQuantity: useCartStore.getState().maxItemQuantity, ...totalForItems(items) };
+          : {
+            maxItemQuantity: useCartStore.getState().maxItemQuantity,
+            total: null,
+            totalAvailable: false,
+          };
       useCartStore.setState({
           items,
           ...financialState,
         status: 'loaded',
         error: null,
+        summaryRefreshError: null,
         successMessage,
       });
       succeeded = true;
@@ -159,13 +158,142 @@ async function runMutation(
   return succeeded;
 }
 
+async function runDeleteAndRefresh(
+  operationKey: string,
+  request: () => Promise<void>,
+  successMessage: string,
+  selectItems: (items: CartItem[]) => CartItem[],
+): Promise<boolean> {
+  const session = currentValidSession();
+  if (!session) {
+    useCartStore.setState({ error: 'Entre na sua conta para acessar o carrinho.' });
+    return false;
+  }
+  if (hasPendingOperations()) return false;
+
+  const generation = ++requestVersion;
+  pendingLoad = null;
+  useCartStore.setState((state) => ({
+    error: null,
+    summaryRefreshError: null,
+    successMessage: null,
+    pendingOperations: { ...state.pendingOperations, [operationKey]: true },
+  }));
+
+  let deletionConfirmed = false;
+  try {
+    await request();
+    if (generation !== requestVersion || activeSession !== session) return false;
+
+    const state = useCartStore.getState();
+    useCartStore.setState({
+      items: selectItems(state.items),
+      maxItemQuantity: state.maxItemQuantity,
+      total: null,
+      totalAvailable: false,
+      status: 'loaded',
+      error: null,
+      summaryRefreshError: null,
+      successMessage,
+    });
+    deletionConfirmed = true;
+
+    try {
+      const response = await cartApi.getCart();
+      if (generation === requestVersion && activeSession === session) {
+        useCartStore.setState({
+          items: response.items,
+          maxItemQuantity: response.maxItemQuantity,
+          total: response.total,
+          totalAvailable: response.totalAvailable,
+          status: 'loaded',
+          error: null,
+          summaryRefreshError: null,
+          successMessage,
+        });
+      }
+    } catch (error) {
+      if (generation === requestVersion && activeSession === session) {
+        if (error instanceof Error && 'kind' in error && error.kind === 'unauthenticated') {
+          useAuthStore.getState().clearSession();
+        } else {
+          useCartStore.setState({
+            total: null,
+            totalAvailable: false,
+            summaryRefreshError: messageFrom(error),
+          });
+        }
+      }
+    }
+  } catch (error) {
+    if (generation === requestVersion && activeSession === session) {
+      const message = messageFrom(error);
+      if (error instanceof Error && 'kind' in error && error.kind === 'unauthenticated') {
+        useAuthStore.getState().clearSession();
+      } else {
+        useCartStore.setState({ error: message, successMessage: null });
+      }
+    }
+  } finally {
+    if (generation === requestVersion && activeSession === session) {
+      useCartStore.setState((state) => {
+        const pendingOperations = { ...state.pendingOperations };
+        delete pendingOperations[operationKey];
+        return { pendingOperations };
+      });
+    }
+  }
+  return deletionConfirmed;
+}
+
+async function retryCartSummary(): Promise<void> {
+  const session = currentValidSession();
+  if (!session || hasPendingOperations()) return;
+
+  const generation = ++requestVersion;
+  useCartStore.setState((state) => ({
+    pendingOperations: { ...state.pendingOperations, refresh: true },
+  }));
+  try {
+    const response = await cartApi.getCart();
+    if (generation === requestVersion && activeSession === session) {
+      useCartStore.setState({
+        items: response.items,
+        maxItemQuantity: response.maxItemQuantity,
+        total: response.total,
+        totalAvailable: response.totalAvailable,
+        status: 'loaded',
+        error: null,
+        summaryRefreshError: null,
+      });
+    }
+  } catch (error) {
+    if (generation === requestVersion && activeSession === session) {
+      if (error instanceof Error && 'kind' in error && error.kind === 'unauthenticated') {
+        useAuthStore.getState().clearSession();
+      } else {
+        useCartStore.setState({ summaryRefreshError: messageFrom(error) });
+      }
+    }
+  } finally {
+    if (generation === requestVersion && activeSession === session) {
+      useCartStore.setState((state) => {
+        const pendingOperations = { ...state.pendingOperations };
+        delete pendingOperations.refresh;
+        return { pendingOperations };
+      });
+    }
+  }
+}
+
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   maxItemQuantity: 99,
-  total: 0,
-  totalAvailable: true,
+  total: null,
+  totalAvailable: false,
   status: 'idle',
   error: null,
+  summaryRefreshError: null,
   successMessage: null,
   pendingOperations: {},
 
@@ -190,6 +318,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             totalAvailable: response.totalAvailable,
             status: 'loaded',
             error: null,
+            summaryRefreshError: null,
           });
         }
       } catch (error) {
@@ -209,7 +338,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   addItem: (request) => {
-    const { maxItemQuantity, items } = get();
+    const { status, maxItemQuantity, items } = get();
+    if (status !== 'loaded') {
+      set({ error: 'Aguarde o carregamento do carrinho antes de adicionar produtos.' });
+      return Promise.resolve(false);
+    }
     const currentQuantity = items.find((item) => item.productId === request.productId)?.quantity ?? 0;
     if (!positiveCartQuantity(request.quantity, maxItemQuantity)
       || currentQuantity + request.quantity > maxItemQuantity) {
@@ -242,22 +375,21 @@ export const useCartStore = create<CartState>((set, get) => ({
     );
   },
 
-  removeItem: (productId) => runMutation(
+  removeItem: (productId) => runDeleteAndRefresh(
     `remove:${productId}`,
-    async () => {
-      await cartApi.removeItem(productId);
-      return cartApi.getCart();
-    },
+    () => cartApi.removeItem(productId),
     'Produto removido do carrinho.',
-    (response) => (response as CartResponse).items,
+    (items) => items.filter((item) => item.productId !== productId),
   ),
 
-  clearCart: () => runMutation(
+  clearCart: () => runDeleteAndRefresh(
     'clear',
     () => cartApi.clearCart(),
     'Carrinho limpo.',
     () => [],
   ),
+
+  retrySummary: retryCartSummary,
 
   dismissFeedback: () => set({ error: null, successMessage: null }),
 }));

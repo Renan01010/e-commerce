@@ -51,7 +51,7 @@ describe('CartItem', () => {
     render(<CartItem item={unavailableItem} pending={false} onQuantityChange={onQuantityChange} onRemove={onRemove} />);
 
     expect(screen.getByText('Produto indisponível')).toBeInTheDocument();
-    expect(screen.getByText('product-2')).toBeInTheDocument();
+    expect(screen.queryByText('product-2')).not.toBeInTheDocument();
     expect(screen.getByText(/não está mais disponível/i)).toBeInTheDocument();
     expect(screen.getByText(/preço e subtotal são desconhecidos/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /quantidade/i })).not.toBeInTheDocument();
@@ -67,6 +67,9 @@ describe('CartItem', () => {
     expect(screen.getByText('Keyboard')).toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByText(/49,90/)).toBeInTheDocument();
+    expect(screen.getByText('/ unidade')).toBeInTheDocument();
+    expect(screen.getByText(/subtotal.*99,80/i)).toBeInTheDocument();
+    expect(screen.queryByText('product-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aumentar quantidade de Keyboard' }));
     expect(onQuantityChange).toHaveBeenCalledWith('product-1', 3);
 
@@ -80,6 +83,8 @@ describe('CartItem', () => {
       onQuantityChange={onQuantityChange} onRemove={onRemove} />);
 
     expect(screen.getByText(/Preço e subtotal indisponíveis/)).toBeInTheDocument();
+    expect(screen.queryByText(/R\$\s*0,00/)).not.toBeInTheDocument();
+    expect(screen.queryByText('product-3')).not.toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Quantidade de Mouse' })).toHaveValue(2);
     expect(screen.getByRole('button', { name: 'Aumentar quantidade de Mouse' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Remover Mouse' }));
@@ -93,6 +98,7 @@ describe('CartItem', () => {
     expect(screen.getByText(/12,34/)).toBeInTheDocument();
     expect(screen.getByText(/24,68/)).toBeInTheDocument();
     expect(screen.getByText(/não está mais disponível/i)).toBeInTheDocument();
+    expect(screen.queryByText('product-4')).not.toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   });
 

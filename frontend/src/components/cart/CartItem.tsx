@@ -17,6 +17,7 @@ export function CartItem({ item, pending, maxItemQuantity = 99, onQuantityChange
   const product = item.product;
   const unavailable = !item.available || !product;
   const priceKnown = item.priceAvailable && item.unitPriceSnapshot !== null;
+  const subtotalKnown = item.priceAvailable && item.subtotal !== null;
   const label = product?.name ?? 'Produto indisponível';
 
   return (
@@ -37,31 +38,28 @@ export function CartItem({ item, pending, maxItemQuantity = 99, onQuantityChange
         </span>
         <h2>{label}</h2>
         {unavailable ? (
-          <>
-            <p className="cart-item__identifier">{item.productId}</p>
-            <div className="cart-item__warning" role="status">
-              <AlertCircle size={16} aria-hidden="true" />
-              <span>{priceKnown
-                ? 'Este produto não está mais disponível. Você pode removê-lo do carrinho.'
-                : 'Este produto não está mais disponível e seu preço e subtotal são desconhecidos. Você pode removê-lo do carrinho.'}</span>
-            </div>
-          </>
+          <div className="cart-item__warning" role="status">
+            <AlertCircle size={16} aria-hidden="true" />
+            <span>{priceKnown
+              ? 'Este produto não está mais disponível. Você pode removê-lo do carrinho.'
+              : 'Este produto não está mais disponível e seu preço e subtotal são desconhecidos. Você pode removê-lo do carrinho.'}</span>
+          </div>
         ) : (
-          <>
-            {product.brand && <p className="cart-item__brand">{product.brand}</p>}
-            <p className="cart-item__identifier">{item.productId}</p>
-          </>
+          product.brand && <p className="cart-item__brand">{product.brand}</p>
         )}
       </div>
 
       <div className="cart-item__actions">
         {priceKnown && (
-          <>
-            <strong className="cart-item__price">{currency.format(item.unitPriceSnapshot!)}</strong>
-            <span className="cart-item__subtotal">Subtotal {currency.format(item.subtotal!)}</span>
-          </>
+          <strong className="cart-item__price">
+            {currency.format(item.unitPriceSnapshot!)} <small>/ unidade</small>
+          </strong>
         )}
-        {!unavailable && !priceKnown && (
+        {subtotalKnown && <span className="cart-item__subtotal">Subtotal {currency.format(item.subtotal!)}</span>}
+        {priceKnown && !subtotalKnown && (
+          <span className="cart-item__subtotal">Subtotal indisponível</span>
+        )}
+        {!priceKnown && (
           <div className="cart-item__warning" role="status">
             <AlertCircle size={16} aria-hidden="true" />
             <span>Preço e subtotal indisponíveis. Você pode remover o produto.</span>

@@ -46,7 +46,7 @@ describe('CartPage', () => {
   beforeEach(() => {
     useAuthStore.getState().clearSession();
     useCartStore.setState({ items: [], status: 'idle', error: null, successMessage: null, pendingOperations: {} });
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.mocked(cartApi.getCart).mockResolvedValue(response(availableItem, unavailableItem));
     vi.mocked(cartApi.setQuantity).mockResolvedValue(response({ ...availableItem, quantity: 3 }, unavailableItem));
     vi.mocked(cartApi.removeItem).mockResolvedValue(undefined);
@@ -61,10 +61,11 @@ describe('CartPage', () => {
     expect(screen.getByText('Keyboard')).toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByText('Produto indisponível')).toBeInTheDocument();
-    expect(screen.getByText('product-2')).toBeInTheDocument();
+    expect(screen.queryByText('product-2')).not.toBeInTheDocument();
     expect(screen.getByText('2 produtos')).toBeInTheDocument();
     expect(screen.getByText('3 unidades')).toBeInTheDocument();
     expect(screen.getByText(/total indisponível/i)).toBeInTheDocument();
+    expect(screen.getByText(/enquanto houver produto sem preço conhecido/i)).toBeInTheDocument();
     expect(cartApi.getCart).toHaveBeenCalledTimes(1);
   });
 
@@ -86,7 +87,7 @@ describe('CartPage', () => {
   });
 
   it('shows a calculable total when all lines have known prices', async () => {
-    vi.mocked(cartApi.getCart).mockResolvedValue(response(availableItem));
+    vi.mocked(cartApi.getCart).mockResolvedValue({ ...response(availableItem), total: 123.45 });
     setAuthenticatedSession();
     renderCart();
 
@@ -94,7 +95,9 @@ describe('CartPage', () => {
 
     expect(screen.getByText(/total do carrinho/i)).toBeInTheDocument();
     expect(within(screen.getByRole('complementary', { name: 'Resumo do carrinho' }))
-      .getByText(/99,80/)).toBeInTheDocument();
+      .getByText(/123,45/)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: 'Resumo do carrinho' }))
+      .queryByText(/99,80/)).not.toBeInTheDocument();
   });
 
   it('updates a quantity using the returned CartResponse', async () => {
@@ -106,6 +109,25 @@ describe('CartPage', () => {
     await user.click(screen.getByRole('button', { name: 'Aumentar quantidade de Keyboard' }));
 
     expect(cartApi.setQuantity).toHaveBeenCalledWith('product-1', 3);
+    expect(await screen.findByRole('spinbutton', { name: 'Quantidade de Keyboard' })).toHaveValue(3);
+  });
+
+  it('locks quantity controls until the server confirms the update', async () => {
+    const user = userEvent.setup();
+    let resolveQuantity: ((cart: CartResponse) => void) | undefined;
+    vi.mocked(cartApi.setQuantity).mockReturnValue(new Promise((resolve) => { resolveQuantity = resolve; }));
+    setAuthenticatedSession();
+    renderCart();
+
+    await screen.findByText('Keyboard');
+    const increase = screen.getByRole('button', { name: 'Aumentar quantidade de Keyboard' });
+    await user.click(increase);
+
+    expect(increase).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: 'Quantidade de Keyboard' })).toHaveValue(2);
+    expect(cartApi.setQuantity).toHaveBeenCalledTimes(1);
+
+    resolveQuantity?.(response({ ...availableItem, quantity: 3 }, unavailableItem));
     expect(await screen.findByRole('spinbutton', { name: 'Quantidade de Keyboard' })).toHaveValue(3);
   });
 
@@ -128,6 +150,9 @@ describe('CartPage', () => {
   it('requires clear confirmation and leaves the cart unchanged when cancelled', async () => {
     const user = userEvent.setup();
     setAuthenticatedSession();
+    vi.mocked(cartApi.getCart)
+      .mockResolvedValueOnce(response(availableItem, unavailableItem))
+      .mockResolvedValueOnce(response());
     renderCart();
     await screen.findByText('Keyboard');
 
@@ -141,6 +166,32 @@ describe('CartPage', () => {
     await user.click(within(screen.getByRole('dialog', { name: 'Limpar carrinho?' })).getByRole('button', { name: 'Confirmar limpeza' }));
     expect(cartApi.clearCart).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Seu carrinho está vazio.')).toBeInTheDocument();
+  });
+
+  it('keeps a confirmed clear and retries only the summary GET after a read failure', async () => {
+    const user = userEvent.setup();
+    setAuthenticatedSession();
+    vi.mocked(cartApi.getCart)
+      .mockResolvedValueOnce(response(availableItem))
+      .mockRejectedValueOnce(new Error('Resumo temporariamente indisponível'))
+      .mockResolvedValueOnce(response());
+    renderCart();
+
+    await screen.findByText('Keyboard');
+    await user.click(screen.getAllByRole('button', { name: 'Limpar carrinho' })[0]);
+    await user.click(within(screen.getByRole('dialog', { name: 'Limpar carrinho?' }))
+      .getByRole('button', { name: 'Confirmar limpeza' }));
+
+    expect(await screen.findByText('Seu carrinho está vazio.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Resumo temporariamente indisponível');
+    expect(cartApi.clearCart).toHaveBeenCalledTimes(1);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByRole('button', { name: 'Atualizar resumo' }));
+
+    expect(await screen.findByText(/total do carrinho/i)).toBeInTheDocument();
+    expect(cartApi.clearCart).toHaveBeenCalledTimes(1);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(3);
   });
 
   it('keeps the route open and offers login without requesting a cart when unauthenticated', async () => {
@@ -158,6 +209,7 @@ describe('CartPage', () => {
     renderCart();
 
     expect(screen.getByRole('status', { name: 'Carregando carrinho' })).toBeInTheDocument();
+    expect(screen.queryByText(/R\$\s*0,00/)).not.toBeInTheDocument();
     resolveCart?.(response(availableItem));
     expect(await screen.findByText('Keyboard')).toBeInTheDocument();
   });
