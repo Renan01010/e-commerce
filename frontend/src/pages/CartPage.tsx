@@ -17,15 +17,18 @@ export function CartPage() {
   const totalAvailable = useCartStore((state) => state.totalAvailable);
   const status = useCartStore((state) => state.status);
   const error = useCartStore((state) => state.error);
+  const summaryRefreshError = useCartStore((state) => state.summaryRefreshError);
   const successMessage = useCartStore((state) => state.successMessage);
   const pendingOperations = useCartStore((state) => state.pendingOperations);
   const loadCart = useCartStore((state) => state.loadCart);
   const setQuantity = useCartStore((state) => state.setQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
   const clearCart = useCartStore((state) => state.clearCart);
+  const retrySummary = useCartStore((state) => state.retrySummary);
   const dismissFeedback = useCartStore((state) => state.dismissFeedback);
   const isAuthenticated = Boolean(session && session.expiresAt > Date.now());
   const units = items.reduce((sum, item) => sum + item.quantity, 0);
+  const hasUnknownPrice = items.some((item) => !item.priceAvailable || item.subtotal === null);
   const mutationPending = Object.values(pendingOperations).some(Boolean);
 
   useEffect(() => {
@@ -79,6 +82,15 @@ export function CartPage() {
               {status === 'error' && <button type="button" onClick={() => void loadCart()}>Tentar novamente</button>}
             </div>
           )}
+          {summaryRefreshError && (
+            <div className="cart-notice cart-notice--error" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{summaryRefreshError} A alteração do carrinho foi confirmada; atualize o resumo.</span>
+              <button type="button" disabled={mutationPending} onClick={() => void retrySummary()}>
+                Atualizar resumo
+              </button>
+            </div>
+          )}
           {successMessage && <p className="cart-notice cart-notice--success" role="status">{successMessage}</p>}
 
           {status === 'loading' || status === 'idle' ? (
@@ -126,10 +138,14 @@ export function CartPage() {
             </div>
             <div className="cart-summary-total" aria-live="polite">
               <span>Total do carrinho</span>
-              {totalAvailable && total !== null ? (
+              {status === 'idle' || status === 'loading' ? (
+                <p className="cart-summary-total__pending" role="status">Carregando total do carrinho…</p>
+              ) : totalAvailable && total !== null ? (
                 <strong>{currency.format(total)}</strong>
               ) : (
-                <p role="status">Total indisponível enquanto houver produto sem preço conhecido.</p>
+                <p role="status">{status === 'loaded' && hasUnknownPrice
+                  ? 'Total indisponível enquanto houver produto sem preço conhecido.'
+                  : 'Total indisponível até que o serviço confirme o resumo.'}</p>
               )}
             </div>
             <Link className="cart-continue button button--primary" to="/">

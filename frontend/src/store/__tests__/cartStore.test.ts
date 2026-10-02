@@ -65,7 +65,7 @@ describe('cartStore', () => {
     useCartStore.setState({
       items: [], status: 'idle', error: null, successMessage: null, pendingOperations: {},
     });
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.mocked(cartApi.getCart).mockResolvedValue(response());
     vi.mocked(cartApi.addItem).mockResolvedValue(response(availableItem));
     vi.mocked(cartApi.setQuantity).mockResolvedValue(response({ ...availableItem, quantity: 3 }));
@@ -86,6 +86,58 @@ describe('cartStore', () => {
     await Promise.all([firstLoad, secondLoad]);
     expect(useCartStore.getState().items).toEqual([availableItem]);
     expect(useCartStore.getState().status).toBe('loaded');
+  });
+
+  it('uses the total returned by the service instead of summing item subtotals', async () => {
+    const serverResponse = { ...response(availableItem), total: 123.45 };
+    vi.mocked(cartApi.getCart).mockResolvedValue(serverResponse);
+    setAuthenticatedSession();
+
+    await useCartStore.getState().loadCart();
+
+    expect(useCartStore.getState().items).toEqual([availableItem]);
+    expect(useCartStore.getState().total).toBe(123.45);
+    expect(useCartStore.getState().totalAvailable).toBe(true);
+  });
+
+  it('fetches the authoritative financial summary after clearing', async () => {
+    setAuthenticatedSession();
+    useCartStore.setState({ items: [availableItem], total: 99.8, totalAvailable: true, status: 'loaded' });
+    vi.mocked(cartApi.getCart).mockResolvedValue(response());
+
+    await useCartStore.getState().clearCart();
+
+    expect(cartApi.clearCart).toHaveBeenCalledTimes(1);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(1);
+    expect(useCartStore.getState().items).toEqual([]);
+    expect(useCartStore.getState().total).toBe(0);
+    expect(useCartStore.getState().totalAvailable).toBe(true);
+  });
+
+  it('keeps a confirmed removal after summary GET fails and retries only the GET', async () => {
+    setAuthenticatedSession();
+    useCartStore.setState({ items: [availableItem, unavailableItem], status: 'loaded', total: null, totalAvailable: false });
+    vi.mocked(cartApi.getCart)
+      .mockRejectedValueOnce(new Error('Resumo temporariamente indisponível'))
+      .mockResolvedValueOnce(response(availableItem));
+
+    const removed = await useCartStore.getState().removeItem(unavailableItem.productId);
+
+    expect(removed).toBe(true);
+    expect(cartApi.removeItem).toHaveBeenCalledTimes(1);
+    expect(useCartStore.getState().items).toEqual([availableItem]);
+    expect(useCartStore.getState().total).toBeNull();
+    expect(useCartStore.getState().totalAvailable).toBe(false);
+    expect(useCartStore.getState().summaryRefreshError).toMatch(/Resumo temporariamente indisponível/);
+
+    await useCartStore.getState().retrySummary();
+
+    expect(cartApi.removeItem).toHaveBeenCalledTimes(1);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(2);
+    expect(useCartStore.getState().items).toEqual([availableItem]);
+    expect(useCartStore.getState().total).toBe(99.8);
+    expect(useCartStore.getState().totalAvailable).toBe(true);
+    expect(useCartStore.getState().summaryRefreshError).toBeNull();
   });
 
   it('replaces cart state from the confirmed mutation response', async () => {
@@ -136,14 +188,28 @@ describe('cartStore', () => {
     expect(useCartStore.getState().error).toMatch(/máxim|limite/i);
   });
 
-  it('does not allow an older GET response to overwrite a confirmed mutation', async () => {
+  it('does not use the initial maximum before a cart response is loaded', async () => {
+    setAuthenticatedSession();
+    useCartStore.setState({ status: 'idle', maxItemQuantity: 99 });
+
+    const succeeded = await useCartStore.getState().addItem({ productId: 'product-1', quantity: 1 });
+
+    expect(succeeded).toBe(false);
+    expect(cartApi.addItem).not.toHaveBeenCalled();
+    expect(useCartStore.getState().error).toMatch(/carregamento do carrinho/i);
+  });
+
+  it('does not allow a mutation while the initial cart response is pending', async () => {
     const pending = deferred<CartResponse>();
     vi.mocked(cartApi.getCart).mockReturnValue(pending.promise);
     setAuthenticatedSession();
 
     const initialLoad = useCartStore.getState().loadCart();
-    await useCartStore.getState().addItem({ productId: 'product-1', quantity: 2 });
-    pending.resolve(response());
+    const succeeded = await useCartStore.getState().addItem({ productId: 'product-1', quantity: 2 });
+
+    expect(succeeded).toBe(false);
+    expect(cartApi.addItem).not.toHaveBeenCalled();
+    pending.resolve(response(availableItem));
     await initialLoad;
 
     expect(useCartStore.getState().items).toEqual([availableItem]);

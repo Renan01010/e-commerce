@@ -64,7 +64,7 @@ export const catalogApi = {
   },
 };
 
-export type CartApiErrorKind = 'unauthenticated' | 'not-found' | 'conflict' | 'unavailable' | 'network' | 'unknown';
+export type CartApiErrorKind = 'unauthenticated' | 'forbidden' | 'validation' | 'not-found' | 'conflict' | 'unavailable' | 'server' | 'network' | 'unknown';
 
 export class CartApiError extends Error {
   constructor(
@@ -86,15 +86,33 @@ function toCartApiError(error: unknown): CartApiError {
   if (status === 401) {
     return new CartApiError('Entre na sua conta para acessar o carrinho.', 'unauthenticated', status);
   }
+  if (status === 403) {
+    return new CartApiError('Você não tem permissão para realizar esta operação.', 'forbidden', status);
+  }
+  if (status === 400) {
+    return new CartApiError('Verifique os dados informados e tente novamente.', 'validation', status);
+  }
   if (status === 404) {
     return new CartApiError('Este item não está mais disponível no carrinho.', 'not-found', status);
   }
   if (status === 409) {
-    const message = (error.response?.data as { message?: string } | undefined)?.message;
-    return new CartApiError(message ?? 'A quantidade excede o limite ou estoque disponível.', 'conflict', status);
+    const response = error.response?.data as { message?: string; details?: string } | undefined;
+    const message = response?.details?.trim() || response?.message?.trim();
+    return new CartApiError(message || 'A quantidade excede o limite ou estoque disponível.', 'conflict', status);
+  }
+  if (status === 422) {
+    const response = error.response?.data as { details?: string } | undefined;
+    return new CartApiError(
+      response?.details?.trim() || 'Não foi possível validar esta operação. Revise os dados e tente novamente.',
+      'validation',
+      status,
+    );
   }
   if (status === 503) {
     return new CartApiError('O carrinho está temporariamente indisponível. Tente novamente.', 'unavailable', status);
+  }
+  if (status !== undefined && status >= 500) {
+    return new CartApiError('O carrinho está temporariamente indisponível. Tente novamente.', 'server', status);
   }
   if (!error.response) {
     return new CartApiError('Não foi possível conectar ao carrinho. Tente novamente.', 'network');

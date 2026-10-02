@@ -40,4 +40,64 @@ describe('App cart navigation and badge', () => {
     expect(await screen.findByRole('heading', { name: 'Seu carrinho' })).toBeInTheDocument();
     expect(cartApi.getCart).toHaveBeenCalledTimes(1);
   });
+
+  it('updates the header badge after every confirmed mutation and keeps server totals authoritative', async () => {
+    useAuthStore.getState().setSession({ accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000 });
+    const cartResponse = (items: CartItem[], total: number) => ({
+      items, maxItemQuantity: 99, total, totalAvailable: true,
+    });
+    vi.mocked(cartApi.getCart)
+      .mockResolvedValueOnce(cartResponse(cartItems, 1000.01))
+      .mockResolvedValueOnce(cartResponse([{ ...cartItems[0], quantity: 1 }], 17.23))
+      .mockResolvedValueOnce(cartResponse([], 0));
+    vi.mocked(cartApi.addItem).mockResolvedValueOnce(cartResponse([
+      { ...cartItems[0], quantity: 3 }, cartItems[1],
+    ], 987.65));
+    vi.mocked(cartApi.setQuantity)
+      .mockResolvedValueOnce(cartResponse([{ ...cartItems[0], quantity: 4 }, cartItems[1]], 456.78))
+      .mockResolvedValueOnce(cartResponse([{ ...cartItems[0], quantity: 1 }, cartItems[1]], 321.09));
+    vi.mocked(cartApi.removeItem).mockResolvedValue(undefined);
+    vi.mocked(cartApi.clearCart).mockResolvedValue(undefined);
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: 'Carrinho, 3 unidades' })).toBeInTheDocument();
+
+    await useCartStore.getState().addItem({ productId: 'product-1', quantity: 1 });
+    expect(await screen.findByRole('link', { name: 'Carrinho, 4 unidades' })).toBeInTheDocument();
+    expect(useCartStore.getState().total).toBe(987.65);
+
+    await useCartStore.getState().setQuantity('product-1', 4);
+    expect(await screen.findByRole('link', { name: 'Carrinho, 5 unidades' })).toBeInTheDocument();
+    expect(useCartStore.getState().total).toBe(456.78);
+
+    await useCartStore.getState().setQuantity('product-1', 1);
+    expect(await screen.findByRole('link', { name: 'Carrinho, 2 unidades' })).toBeInTheDocument();
+    expect(useCartStore.getState().total).toBe(321.09);
+
+    await useCartStore.getState().removeItem('product-2');
+    expect(await screen.findByRole('link', { name: 'Carrinho, 1 unidade' })).toBeInTheDocument();
+    expect(useCartStore.getState().total).toBe(17.23);
+
+    await useCartStore.getState().clearCart();
+    expect(await screen.findByRole('link', { name: 'Carrinho, 0 unidades' })).toBeInTheDocument();
+    expect(useCartStore.getState().total).toBe(0);
+    expect(cartApi.addItem).toHaveBeenCalledTimes(1);
+    expect(cartApi.setQuantity).toHaveBeenCalledTimes(2);
+    expect(cartApi.removeItem).toHaveBeenCalledTimes(1);
+    expect(cartApi.clearCart).toHaveBeenCalledTimes(1);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears cart state in the header when its session is rejected with 401', async () => {
+    vi.mocked(cartApi.getCart).mockRejectedValue(Object.assign(new Error('Authentication required'), {
+      kind: 'unauthenticated',
+    }));
+    useAuthStore.getState().setSession({ accessToken: 'expired-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000 });
+    useCartStore.setState({ items: cartItems, status: 'idle' });
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: 'Carrinho' })).toBeInTheDocument();
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useCartStore.getState().items).toEqual([]);
+  });
 });

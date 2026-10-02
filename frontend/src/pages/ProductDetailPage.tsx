@@ -20,6 +20,10 @@ export function ProductDetailPage() {
   const [quantity, setQuantity] = useState('1');
   const session = useAuthStore((state) => state.session);
   const addItem = useCartStore((state) => state.addItem);
+  const cartStatus = useCartStore((state) => state.status);
+  const cartItems = useCartStore((state) => state.items);
+  const maxItemQuantity = useCartStore((state) => state.maxItemQuantity);
+  const loadCart = useCartStore((state) => state.loadCart);
   const dismissCartFeedback = useCartStore((state) => state.dismissFeedback);
   const cartError = useCartStore((state) => state.error);
   const cartSuccess = useCartStore((state) => state.successMessage);
@@ -37,6 +41,13 @@ export function ProductDetailPage() {
   }, [id]);
 
   const isAuthenticated = Boolean(session && session.expiresAt > Date.now());
+  const cartLimitLoaded = cartStatus === 'loaded';
+  const existingQuantity = cartItems.find((item) => item.productId === id)?.quantity ?? 0;
+  const remainingQuantity = Math.max(0, maxItemQuantity - existingQuantity);
+
+  useEffect(() => {
+    if (isAuthenticated && cartStatus === 'idle') void loadCart();
+  }, [isAuthenticated, cartStatus, loadCart]);
 
   async function handleAddToCart() {
     if (!product || !isAuthenticated) return;
@@ -77,7 +88,7 @@ export function ProductDetailPage() {
               aria-label="Quantidade"
               type="number"
               min="1"
-              max="2147483647"
+              max={cartLimitLoaded ? remainingQuantity : undefined}
               step="1"
               inputMode="numeric"
               value={quantity}
@@ -90,12 +101,21 @@ export function ProductDetailPage() {
           <button
             className="button button--primary"
             type="button"
-            disabled={!isAuthenticated || pendingAdd || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0 || Number(quantity) > 2_147_483_647}
+            disabled={!isAuthenticated || !cartLimitLoaded || pendingAdd || !Number.isInteger(Number(quantity))
+              || Number(quantity) <= 0 || Number(quantity) > remainingQuantity || Number(quantity) > 2_147_483_647}
             onClick={() => void handleAddToCart()}
           >
             {pendingAdd ? 'Adicionando…' : 'Adicionar ao carrinho'}
           </button>
           {!isAuthenticated && <p className="cart-login-prompt">Entre na sua conta para adicionar este produto. <Link to="/login">Fazer login</Link></p>}
+          {isAuthenticated && (cartStatus === 'idle' || cartStatus === 'loading') && (
+            <p className="cart-feedback" role="status">Carregando o limite do carrinho…</p>
+          )}
+          {isAuthenticated && cartStatus === 'error' && (
+            <button className="button button--outline" type="button" onClick={() => void loadCart()}>
+              Tentar carregar carrinho
+            </button>
+          )}
           {cartError && <p className="cart-feedback cart-feedback--error" role="alert">{cartError}</p>}
           {cartSuccess && <p className="cart-feedback" role="status">{cartSuccess}</p>}
           {category && <dl className="product-facts"><div><dt>Categoria</dt><dd>{categoryLabel(category.id, categories)}</dd></div><div><dt>Referência</dt><dd>{product.sku}</dd></div></dl>}

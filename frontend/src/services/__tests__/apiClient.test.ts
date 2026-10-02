@@ -138,6 +138,42 @@ describe('cartApi', () => {
     expect(getApiErrorMessage(requestError)).toBe('backend detail');
   });
 
+  it.each([
+    [400, 'validation'],
+    [403, 'forbidden'],
+    [422, 'validation'],
+    [500, 'server'],
+  ] as const)('classifies cart HTTP error %i with a friendly fallback', async (status, kind) => {
+    const requestError = Object.assign(new Error('backend detail'), {
+      isAxiosError: true,
+      response: { status, data: { message: 'Technical backend message' } },
+    });
+    vi.spyOn(apiClient, 'post').mockRejectedValue(requestError);
+    const { cartApi } = await import('../apiClient');
+
+    await expect(cartApi.addItem({ productId: 'product-1', quantity: 1 })).rejects.toMatchObject({
+      kind,
+      status,
+    });
+    await expect(cartApi.addItem({ productId: 'product-1', quantity: 1 })).rejects.not.toThrow(/HTTP 400|HTTP 403|HTTP 422|HTTP 500/);
+  });
+
+  it('preserves actionable ErrorResponse details when they are present', async () => {
+    const requestError = Object.assign(new Error('backend detail'), {
+      isAxiosError: true,
+      response: { status: 409, data: { message: 'Conflict', details: 'Estoque disponível: 3.' } },
+    });
+    vi.spyOn(apiClient, 'put').mockRejectedValue(requestError);
+    const { CartApiError, cartApi } = await import('../apiClient');
+
+    await expect(cartApi.setQuantity('product-1', 4)).rejects.toMatchObject({
+      name: CartApiError.name,
+      kind: 'conflict',
+      status: 409,
+      message: 'Estoque disponível: 3.',
+    });
+  });
+
   it('preserves business conflict details from the cart service', async () => {
     const requestError = Object.assign(new Error('backend detail'), {
       isAxiosError: true,
