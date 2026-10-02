@@ -57,6 +57,12 @@ public class CartApplicationConfiguration {
     }
 
     @Bean
+    InitializeLegacyPriceSnapshotsService initializeLegacyPriceSnapshotsService(
+            CartStorePort cartStore, ProductCatalogPort productCatalog) {
+        return new InitializeLegacyPriceSnapshotsService(cartStore, productCatalog);
+    }
+
+    @Bean
     ApplicationRunner initializeLegacyPriceSnapshots(InitializeLegacyPriceSnapshotsService initializer) {
         return args -> initializer.initialize();
     }

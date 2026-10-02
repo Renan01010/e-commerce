@@ -66,7 +66,7 @@ Use the existing authenticated endpoints and an isolated owner:
 Validated on 2026-10-01 in this workspace:
 
 - Backend command: `mvn -f backend/pom.xml -pl cart-service clean test -Dnet.bytebuddy.experimental=true`.
-- Backend result: 76 tests, 0 failures, 0 errors, 12 skipped. The skipped tests are Testcontainers/PostgreSQL integration and concurrency cases because Docker is not installed/available in this environment.
+- Backend result: 77 tests, 0 failures, 0 errors, 12 skipped. The skipped tests are Testcontainers/PostgreSQL integration and concurrency cases because Docker is not installed/available in this environment.
 - JWT/security regression: 3 `CartSecurityIntegrationTest` cases passed; cart HTTP/OpenAPI tests passed. Database-backed cross-owner isolation remains among the Docker-skipped tests.
 - Frontend command: `npm --prefix frontend test`.
 - Frontend result: 15 test files and 64 tests passed.

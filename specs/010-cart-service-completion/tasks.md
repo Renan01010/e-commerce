@@ -118,7 +118,7 @@
 ## Phase 7: Polish and Cross-Cutting Validation
 
 - [x] T041 Extend `backend/cart-service/src/test/java/com/techstore/cart/adapter/persistence/CartConcurrentAddIntegrationTest.java` to race additions at maximum/stock boundaries and prove one line never exceeds either bound (compiled; runtime skipped because Docker is unavailable).
-- [x] T042 Run backend module and dependent-module tests with `mvn -f backend/pom.xml -pl cart-service -am test`; resolve failures attributable to this feature and record results in `specs/010-cart-service-completion/quickstart.md` (76 tests, 0 failures/errors, 12 Testcontainers skips).
+- [x] T042 Run backend module and dependent-module tests with `mvn -f backend/pom.xml -pl cart-service -am test`; resolve failures attributable to this feature and record results in `specs/010-cart-service-completion/quickstart.md` (77 tests, 0 failures/errors, 12 Testcontainers skips).
 - [x] T043 Run `npm --prefix frontend test -- --run` and `npm --prefix frontend run build`; record results in `specs/010-cart-service-completion/quickstart.md` (15 files/64 tests passed; build passed).
 - [ ] T044 BLOCKED: Build `backend/cart-service/Dockerfile` from repository root and verify the packaged JAR contains V2; Docker CLI/daemon is unavailable here.
 - [ ] T045 BLOCKED: Execute the controlled Railway rollout and smoke checklist in `specs/010-cart-service-completion/quickstart.md`; Railway deployment access/CLI is unavailable, so no production migration or smoke result is claimed.
