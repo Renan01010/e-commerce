@@ -24,6 +24,8 @@ spring:
     locations: classpath:db/migration
 
 techstore:
+  cart:
+    max-item-quantity: ${MAX_CART_ITEM_QUANTITY:99}
   jwt:
     secret: ${TECHSTORE_JWT_SECRET}
   product-service:

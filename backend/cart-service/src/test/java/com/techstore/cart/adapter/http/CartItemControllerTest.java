@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.techstore.cart.adapter.security.CartOwnerResolver;
 import com.techstore.cart.adapter.security.SecurityConfig;
+import com.techstore.cart.application.exception.CartQuantityLimitExceededException;
+import com.techstore.cart.application.exception.InsufficientProductStockException;
 import com.techstore.cart.application.model.AddCartItemResult;
 import com.techstore.cart.application.model.CartView;
 import com.techstore.cart.application.service.AddCartItemService;
@@ -69,6 +71,35 @@ class CartItemControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(5));
+    }
+
+    @Test
+    void returnsConflictWhenAddExceedsQuantityLimit() throws Exception {
+        when(addCartItemService.add(OWNER_ID, PRODUCT_ID, 1))
+                .thenThrow(new CartQuantityLimitExceededException(99));
+
+        mockMvc.perform(post("/api/cart/items").with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"550e8400-e29b-41d4-a716-446655440000","quantity":1}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void returnsConflictWhenUpdatedQuantityExceedsStock() throws Exception {
+        when(setCartItemQuantityService.setQuantity(OWNER_ID, PRODUCT_ID, 4))
+                .thenThrow(new InsufficientProductStockException(3));
+
+        mockMvc.perform(put("/api/cart/items/{productId}", PRODUCT_ID)
+                        .with(jwt().jwt(token -> token.subject(OWNER_ID.toString())))
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"quantity":4}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test

@@ -120,6 +120,7 @@ describe('cartApi', () => {
   it.each([
     [401, 'unauthenticated'],
     [404, 'not-found'],
+    [409, 'conflict'],
     [503, 'unavailable'],
   ] as const)('classifies cart HTTP error %i without changing catalog errors', async (status, kind) => {
     const requestError = Object.assign(new Error('backend detail'), {
@@ -135,6 +136,22 @@ describe('cartApi', () => {
       status,
     });
     expect(getApiErrorMessage(requestError)).toBe('backend detail');
+  });
+
+  it('preserves business conflict details from the cart service', async () => {
+    const requestError = Object.assign(new Error('backend detail'), {
+      isAxiosError: true,
+      response: { status: 409, data: { message: 'Estoque disponível: 3.' } },
+    });
+    vi.spyOn(apiClient, 'post').mockRejectedValue(requestError);
+    const { CartApiError, cartApi } = await import('../apiClient');
+
+    await expect(cartApi.addItem({ productId: 'product-1', quantity: 4 })).rejects.toMatchObject({
+      name: CartApiError.name,
+      kind: 'conflict',
+      status: 409,
+      message: 'Estoque disponível: 3.',
+    });
   });
 
   it('classifies a network failure as retryable cart unavailability', async () => {

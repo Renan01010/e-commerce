@@ -6,10 +6,15 @@ import { ClearCartConfirmation } from '../components/cart/ClearCartConfirmation'
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export function CartPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const session = useAuthStore((state) => state.session);
   const items = useCartStore((state) => state.items);
+  const maxItemQuantity = useCartStore((state) => state.maxItemQuantity);
+  const total = useCartStore((state) => state.total);
+  const totalAvailable = useCartStore((state) => state.totalAvailable);
   const status = useCartStore((state) => state.status);
   const error = useCartStore((state) => state.error);
   const successMessage = useCartStore((state) => state.successMessage);
@@ -103,6 +108,7 @@ export function CartPage() {
                   key={item.productId}
                   item={item}
                   pending={mutationPending}
+                  maxItemQuantity={maxItemQuantity}
                   onQuantityChange={(productId, quantity) => { dismissFeedback(); void setQuantity(productId, quantity); }}
                   onRemove={(productId) => { dismissFeedback(); void removeItem(productId); }}
                 />
@@ -117,6 +123,14 @@ export function CartPage() {
             <div className="cart-summary-count">
               <ShoppingBag size={24} aria-hidden="true" />
               <p><strong>{items.length} {items.length === 1 ? 'produto' : 'produtos'}</strong><span>{units} {units === 1 ? 'unidade' : 'unidades'}</span></p>
+            </div>
+            <div className="cart-summary-total" aria-live="polite">
+              <span>Total do carrinho</span>
+              {totalAvailable && total !== null ? (
+                <strong>{currency.format(total)}</strong>
+              ) : (
+                <p role="status">Total indisponível enquanto houver produto sem preço conhecido.</p>
+              )}
             </div>
             <Link className="cart-continue button button--primary" to="/">
               <ShoppingBag size={16} aria-hidden="true" /> Continuar comprando

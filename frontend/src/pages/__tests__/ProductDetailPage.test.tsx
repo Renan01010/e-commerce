@@ -6,6 +6,7 @@ import { cartApi, catalogApi } from '../../services/apiClient';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { useCatalogStore } from '../../store/catalogStore';
+import type { CartResponse } from '../../types/cart';
 import { ProductDetailPage } from '../ProductDetailPage';
 
 vi.mock('../../services/apiClient', () => ({
@@ -36,12 +37,13 @@ describe('ProductDetailPage', () => {
     vi.mocked(cartApi.addItem).mockResolvedValue({ items: [{
       productId: product.id, quantity: 2, available: true,
       product: { name: product.name, price: product.price, brand: product.brand, imageUrl: product.imageUrl },
-    }] });
+      unitPriceSnapshot: product.price, priceAvailable: true, subtotal: product.price * 2,
+    }], maxItemQuantity: 99, total: product.price * 2, totalAvailable: true });
   });
 
   it('adds the selected quantity once and does not block an active product with zero stock', async () => {
     const user = userEvent.setup();
-    let resolveAdd: ((value: { items: [] }) => void) | undefined;
+    let resolveAdd: ((value: CartResponse) => void) | undefined;
     vi.mocked(cartApi.addItem).mockReturnValue(new Promise((resolve) => { resolveAdd = resolve; }));
     renderProductDetail();
 
@@ -57,7 +59,7 @@ describe('ProductDetailPage', () => {
     await user.click(addButton);
     expect(cartApi.addItem).toHaveBeenCalledTimes(1);
 
-    resolveAdd?.({ items: [] });
+    resolveAdd?.({ items: [], maxItemQuantity: 99, total: 0, totalAvailable: true });
     expect(await screen.findByRole('status')).toHaveTextContent('Produto adicionado ao carrinho.');
   });
 });

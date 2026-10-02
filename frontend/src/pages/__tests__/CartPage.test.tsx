@@ -17,9 +17,18 @@ vi.mock('../../services/apiClient', () => ({
 const availableItem: CartItem = {
   productId: 'product-1', quantity: 2, available: true,
   product: { name: 'Keyboard', price: 49.9, brand: 'Acme', imageUrl: null },
+  unitPriceSnapshot: 49.9, priceAvailable: true, subtotal: 99.8,
 };
-const unavailableItem: CartItem = { productId: 'product-2', quantity: 1, available: false, product: null };
-const response = (...items: CartItem[]): CartResponse => ({ items });
+const unavailableItem: CartItem = {
+  productId: 'product-2', quantity: 1, available: false, product: null,
+  unitPriceSnapshot: null, priceAvailable: false, subtotal: null,
+};
+const response = (...items: CartItem[]): CartResponse => ({
+  items,
+  maxItemQuantity: 99,
+  total: items.some((item) => !item.priceAvailable) ? null : items.reduce((sum, item) => sum + (item.subtotal ?? 0), 0),
+  totalAvailable: items.every((item) => item.priceAvailable),
+});
 
 function setAuthenticatedSession() {
   useAuthStore.getState().setSession({ accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000 });
@@ -44,7 +53,7 @@ describe('CartPage', () => {
     vi.mocked(cartApi.clearCart).mockResolvedValue(undefined);
   });
 
-  it('loads available and unavailable rows and shows counts without a financial total', async () => {
+  it('loads available and unavailable rows and reports the total as unavailable', async () => {
     setAuthenticatedSession();
     renderCart();
 
@@ -55,8 +64,37 @@ describe('CartPage', () => {
     expect(screen.getByText('product-2')).toBeInTheDocument();
     expect(screen.getByText('2 produtos')).toBeInTheDocument();
     expect(screen.getByText('3 unidades')).toBeInTheDocument();
-    expect(screen.queryByText(/subtotal|frete|total geral/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/total indisponível/i)).toBeInTheDocument();
     expect(cartApi.getCart).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the known total and restores it after removing the unknown-price line', async () => {
+    const user = userEvent.setup();
+    setAuthenticatedSession();
+    vi.mocked(cartApi.getCart)
+      .mockResolvedValueOnce(response(availableItem, unavailableItem))
+      .mockResolvedValueOnce(response(availableItem));
+    renderCart();
+
+    await screen.findByText('Keyboard');
+    expect(screen.getByText(/total indisponível/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remover Produto indisponível' }));
+
+    expect(await screen.findByText(/total do carrinho/i)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: 'Resumo do carrinho' }))
+      .getByText(/99,80/)).toBeInTheDocument();
+  });
+
+  it('shows a calculable total when all lines have known prices', async () => {
+    vi.mocked(cartApi.getCart).mockResolvedValue(response(availableItem));
+    setAuthenticatedSession();
+    renderCart();
+
+    await screen.findByText('Keyboard');
+
+    expect(screen.getByText(/total do carrinho/i)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: 'Resumo do carrinho' }))
+      .getByText(/99,80/)).toBeInTheDocument();
   });
 
   it('updates a quantity using the returned CartResponse', async () => {
@@ -74,6 +112,9 @@ describe('CartPage', () => {
   it('removes an unavailable product without sending quantity changes', async () => {
     const user = userEvent.setup();
     setAuthenticatedSession();
+    vi.mocked(cartApi.getCart)
+      .mockResolvedValueOnce(response(availableItem, unavailableItem))
+      .mockResolvedValueOnce(response(availableItem));
     renderCart();
 
     await screen.findByText('Produto indisponível');

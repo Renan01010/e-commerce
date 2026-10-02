@@ -9,6 +9,9 @@ const availableItem: CartItemData = {
   quantity: 2,
   available: true,
   product: { name: 'Keyboard', price: 49.9, brand: 'Acme', imageUrl: null },
+  unitPriceSnapshot: 49.9,
+  priceAvailable: true,
+  subtotal: 99.8,
 };
 
 const unavailableItem: CartItemData = {
@@ -16,6 +19,29 @@ const unavailableItem: CartItemData = {
   quantity: 1,
   available: false,
   product: null,
+  unitPriceSnapshot: null,
+  priceAvailable: false,
+  subtotal: null,
+};
+
+const unknownPriceItem: CartItemData = {
+  productId: 'product-3',
+  quantity: 2,
+  available: true,
+  product: { name: 'Mouse', price: null, brand: 'Acme', imageUrl: null },
+  unitPriceSnapshot: null,
+  priceAvailable: false,
+  subtotal: null,
+};
+
+const inactiveKnownPriceItem: CartItemData = {
+  productId: 'product-4',
+  quantity: 2,
+  available: false,
+  product: null,
+  unitPriceSnapshot: 12.34,
+  priceAvailable: true,
+  subtotal: 24.68,
 };
 
 describe('CartItem', () => {
@@ -27,6 +53,7 @@ describe('CartItem', () => {
     expect(screen.getByText('Produto indisponível')).toBeInTheDocument();
     expect(screen.getByText('product-2')).toBeInTheDocument();
     expect(screen.getByText(/não está mais disponível/i)).toBeInTheDocument();
+    expect(screen.getByText(/preço e subtotal são desconhecidos/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /quantidade/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /remover/i }));
     expect(onRemove).toHaveBeenCalledWith('product-2');
@@ -44,6 +71,38 @@ describe('CartItem', () => {
     expect(onQuantityChange).toHaveBeenCalledWith('product-1', 3);
 
     expect(screen.getByRole('button', { name: 'Diminuir quantidade de Keyboard' })).toBeEnabled();
+  });
+
+  it('explains unknown price while preserving quantity and removal actions', () => {
+    const onQuantityChange = vi.fn();
+    const onRemove = vi.fn();
+    render(<CartItem item={unknownPriceItem} pending={false} maxItemQuantity={4}
+      onQuantityChange={onQuantityChange} onRemove={onRemove} />);
+
+    expect(screen.getByText(/Preço e subtotal indisponíveis/)).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Quantidade de Mouse' })).toHaveValue(2);
+    expect(screen.getByRole('button', { name: 'Aumentar quantidade de Mouse' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Remover Mouse' }));
+    expect(onRemove).toHaveBeenCalledWith('product-3');
+  });
+
+  it('shows a known snapshot subtotal even if the catalog product is inactive', () => {
+    render(<CartItem item={inactiveKnownPriceItem} pending={false} maxItemQuantity={99}
+      onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.getByText(/12,34/)).toBeInTheDocument();
+    expect(screen.getByText(/24,68/)).toBeInTheDocument();
+    expect(screen.getByText(/não está mais disponível/i)).toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  });
+
+  it('disables increment at the effective maxItemQuantity', () => {
+    const atLimit = { ...availableItem, quantity: 4 };
+    render(<CartItem item={atLimit} pending={false} maxItemQuantity={4}
+      onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.getByRole('spinbutton', { name: 'Quantidade de Keyboard' })).toHaveAttribute('max', '4');
+    expect(screen.getByRole('button', { name: 'Aumentar quantidade de Keyboard' })).toBeDisabled();
   });
 
   it('prevents decrementing below one and disables pending item actions', () => {

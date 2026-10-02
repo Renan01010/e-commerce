@@ -1,6 +1,11 @@
 package com.techstore.cart.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,8 +43,10 @@ class GetCartServiceTest {
         CartView response = service.getCart(OWNER_ID);
 
         assertEquals(List.of(), response.items());
+        assertEquals(java.math.BigDecimal.ZERO, response.total());
+        assertTrue(response.totalAvailable());
         verify(cartStore).findByOwner(OWNER_ID);
-        verify(cartStore, never()).add(OWNER_ID, PRODUCT_ID, 1);
+        verify(cartStore, never()).add(any(), any(), anyInt(), any(), anyInt(), anyInt());
         verify(cartStore, never()).clear(OWNER_ID);
     }
 
@@ -54,5 +61,21 @@ class GetCartServiceTest {
 
         assertEquals(PRODUCT_ID, response.items().getFirst().productId());
         verify(cartStore).findByOwner(OWNER_ID);
+    }
+
+    @Test
+    void reportsUnavailableTotalWhenAnyLineHasUnknownPrice() {
+        List<CartItem> rows = List.of(new CartItem(PRODUCT_ID, 3));
+        CartView assembled = new CartView(List.of(new CartView.Item(
+                PRODUCT_ID, 3, true, new CartView.ProductSummary("Keyboard", null, "Acme", null),
+                com.techstore.cart.domain.UnitPriceSnapshot.unknown())));
+        when(cartStore.findByOwner(OWNER_ID)).thenReturn(rows);
+        when(cartViewAssembler.assemble(rows)).thenReturn(assembled);
+
+        CartView response = service.getCart(OWNER_ID);
+
+        assertFalse(response.totalAvailable());
+        assertNull(response.total());
+        assertNull(response.items().getFirst().subtotal());
     }
 }

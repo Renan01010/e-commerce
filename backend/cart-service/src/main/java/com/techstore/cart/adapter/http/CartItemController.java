@@ -61,6 +61,7 @@ public class CartItemController {
             @ApiResponse(responseCode = "400", description = "Request inválido"),
             @ApiResponse(responseCode = "401", description = "JWT ausente, inválido ou expirado"),
             @ApiResponse(responseCode = "404", description = "Produto inexistente ou inativo"),
+                @ApiResponse(responseCode = "409", description = "Quantidade acima do limite ou estoque insuficiente"),
             @ApiResponse(responseCode = "503", description = "Product Service indisponível")
         })
     public ResponseEntity<CartResponse> add(@Valid @RequestBody AddCartItemRequest request,
@@ -83,9 +84,10 @@ public class CartItemController {
             @ApiResponse(responseCode = "400", description = "Request inválido"),
             @ApiResponse(responseCode = "401", description = "JWT ausente, inválido ou expirado"),
             @ApiResponse(responseCode = "404", description = "Item ou produto ausente/inativo"),
+                @ApiResponse(responseCode = "409", description = "Quantidade acima do limite ou estoque insuficiente"),
             @ApiResponse(responseCode = "503", description = "Product Service indisponível")
         })
-    public CartResponse setQuantity(@PathVariable UUID productId,
+    public CartResponse setQuantity(@PathVariable("productId") UUID productId,
                                     @Valid @RequestBody SetCartItemQuantityRequest request,
                                     Authentication authentication) {
         UUID ownerUserId = cartOwnerResolver.resolve(authentication);
@@ -102,7 +104,7 @@ public class CartItemController {
             @ApiResponse(responseCode = "401", description = "JWT ausente, inválido ou expirado"),
             @ApiResponse(responseCode = "404", description = "Item não pertence ao carrinho")
         })
-    public ResponseEntity<Void> remove(@PathVariable UUID productId, Authentication authentication) {
+    public ResponseEntity<Void> remove(@PathVariable("productId") UUID productId, Authentication authentication) {
         UUID ownerUserId = cartOwnerResolver.resolve(authentication);
         removeCartItemService.remove(ownerUserId, productId);
         log.info("cart_operation=item_removed ownerUserId={} productId={}", ownerUserId, productId);
@@ -110,13 +112,15 @@ public class CartItemController {
     }
 
     private CartResponse cartResponse(CartView view) {
-        return new CartResponse(view.items().stream().map(this::toResponse).toList());
+        return new CartResponse(view.items().stream().map(this::toResponse).toList(), view.maxItemQuantity(),
+            view.total(), view.totalAvailable());
     }
 
     private CartItemResponse toResponse(CartView.Item item) {
         CartView.ProductSummary summary = item.product();
         ProductSummaryResponse product = summary == null ? null : new ProductSummaryResponse(
                 summary.name(), summary.price(), summary.brand(), summary.imageUrl());
-        return new CartItemResponse(item.productId(), item.quantity(), item.available(), product);
+        return new CartItemResponse(item.productId(), item.quantity(), item.available(), product,
+            item.unitPriceSnapshot(), item.priceAvailable(), item.subtotal());
     }
 }

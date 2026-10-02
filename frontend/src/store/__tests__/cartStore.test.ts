@@ -19,6 +19,9 @@ const availableItem: CartItem = {
   quantity: 2,
   available: true,
   product: { name: 'Keyboard', price: 49.9, brand: 'Acme', imageUrl: null },
+  unitPriceSnapshot: 49.9,
+  priceAvailable: true,
+  subtotal: 99.8,
 };
 
 const unavailableItem: CartItem = {
@@ -26,9 +29,17 @@ const unavailableItem: CartItem = {
   quantity: 1,
   available: false,
   product: null,
+  unitPriceSnapshot: null,
+  priceAvailable: false,
+  subtotal: null,
 };
 
-const response = (...items: CartItem[]): CartResponse => ({ items });
+const response = (...items: CartItem[]): CartResponse => ({
+  items,
+  maxItemQuantity: 99,
+  total: items.some((item) => !item.priceAvailable) ? null : items.reduce((sum, item) => sum + (item.subtotal ?? 0), 0),
+  totalAvailable: items.every((item) => item.priceAvailable),
+});
 
 function setAuthenticatedSession() {
   useAuthStore.getState().setSession({
@@ -98,6 +109,31 @@ describe('cartStore', () => {
     expect(useCartStore.getState().items).toEqual([availableItem]);
     expect(useCartStore.getState().error).toBe('Request failed');
     expect(useCartStore.getState().pendingOperations).toEqual({});
+  });
+
+  it('refreshes the server total after removing an unknown-price line', async () => {
+    setAuthenticatedSession();
+    useCartStore.setState({ items: [availableItem, unavailableItem], status: 'loaded' });
+    vi.mocked(cartApi.getCart).mockResolvedValueOnce(response(availableItem));
+
+    await useCartStore.getState().removeItem(unavailableItem.productId);
+
+    expect(cartApi.removeItem).toHaveBeenCalledWith(unavailableItem.productId);
+    expect(cartApi.getCart).toHaveBeenCalledTimes(1);
+    expect(useCartStore.getState().items).toEqual([availableItem]);
+    expect(useCartStore.getState().total).toBe(99.8);
+    expect(useCartStore.getState().totalAvailable).toBe(true);
+  });
+
+  it('rejects a quantity above the effective cart maximum before calling the API', async () => {
+    setAuthenticatedSession();
+    useCartStore.setState({ maxItemQuantity: 4, status: 'loaded' });
+
+    const succeeded = await useCartStore.getState().addItem({ productId: 'product-1', quantity: 5 });
+
+    expect(succeeded).toBe(false);
+    expect(cartApi.addItem).not.toHaveBeenCalled();
+    expect(useCartStore.getState().error).toMatch(/máxim|limite/i);
   });
 
   it('does not allow an older GET response to overwrite a confirmed mutation', async () => {
