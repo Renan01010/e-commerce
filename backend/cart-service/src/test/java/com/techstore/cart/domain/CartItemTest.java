@@ -3,6 +3,7 @@ package com.techstore.cart.domain;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,5 +29,27 @@ class CartItemTest {
     @Test
     void rejectsMissingProductId() {
         assertThrows(IllegalArgumentException.class, () -> new CartItem(null, 1));
+    }
+
+    @Test
+    void acceptsKnownPriceSnapshot() {
+        UnitPriceSnapshot snapshot = UnitPriceSnapshot.known(new BigDecimal("12.34"));
+        CartItem item = new CartItem(PRODUCT_ID, 2, snapshot);
+
+        assertEquals(snapshot, item.unitPriceSnapshot());
+        assertEquals(new BigDecimal("12.34"), item.unitPriceSnapshot().amount());
+    }
+
+    @Test
+    void acceptsUnknownPriceWithoutInventingAnAmount() {
+        CartItem item = new CartItem(PRODUCT_ID, 1, UnitPriceSnapshot.unknown());
+
+        assertEquals(UnitPriceSnapshot.Status.UNKNOWN, item.unitPriceSnapshot().status());
+        assertEquals(null, item.unitPriceSnapshot().amount());
+    }
+
+    @Test
+    void rejectsMissingPriceSnapshot() {
+        assertThrows(IllegalArgumentException.class, () -> new CartItem(PRODUCT_ID, 1, null));
     }
 }

@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.techstore.cart.application.exception.CartItemNotFoundException;
+import com.techstore.cart.application.exception.CartQuantityLimitExceededException;
+import com.techstore.cart.application.exception.InsufficientProductStockException;
 import com.techstore.cart.application.exception.ProductCatalogUnavailableException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -17,7 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @WebMvcTest(CartExceptionHandlerTest.FailingEndpoint.class)
-@Import(CartExceptionHandler.class)
+@Import({CartExceptionHandler.class, CartExceptionHandlerTest.FailingEndpoint.class})
 @WithMockUser
 class CartExceptionHandlerTest {
     @Autowired
@@ -44,21 +46,41 @@ class CartExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(503));
     }
 
+            @Test
+            void mapsCartRuleConflictsToConflict() throws Exception {
+            mockMvc.perform(get("/test/quantity-limit"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+            mockMvc.perform(get("/test/stock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+            }
+
     @RestController
-    static class FailingEndpoint {
+    public static class FailingEndpoint {
         @GetMapping("/test/validation")
-        void validation() {
+        public void validation() {
             throw new IllegalArgumentException("invalid request");
         }
 
         @GetMapping("/test/missing")
-        void missing() {
+        public void missing() {
             throw new CartItemNotFoundException(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"));
         }
 
         @GetMapping("/test/catalog")
-        void catalog() {
+        public void catalog() {
             throw new ProductCatalogUnavailableException("catalog unavailable");
+        }
+
+        @GetMapping("/test/quantity-limit")
+        public void quantityLimit() {
+            throw new CartQuantityLimitExceededException(99);
+        }
+
+        @GetMapping("/test/stock")
+        public void stock() {
+            throw new InsufficientProductStockException(3);
         }
     }
 }

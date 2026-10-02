@@ -1,6 +1,6 @@
 export interface ProductSummary {
   name: string;
-  price: number;
+  price: number | null;
   brand: string | null;
   imageUrl: string | null;
 }
@@ -10,10 +10,16 @@ export interface CartItem {
   quantity: number;
   available: boolean;
   product: ProductSummary | null;
+  unitPriceSnapshot: number | null;
+  priceAvailable: boolean;
+  subtotal: number | null;
 }
 
 export interface CartResponse {
   items: CartItem[];
+  maxItemQuantity: number;
+  total: number | null;
+  totalAvailable: boolean;
 }
 
 export interface AddCartItemRequest {

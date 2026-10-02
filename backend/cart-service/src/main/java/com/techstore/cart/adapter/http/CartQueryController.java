@@ -44,13 +44,15 @@ public class CartQueryController {
         UUID ownerUserId = cartOwnerResolver.resolve(authentication);
         CartView view = getCartService.getCart(ownerUserId);
         log.info("cart_operation=read ownerUserId={} itemCount={}", ownerUserId, view.items().size());
-        return new CartResponse(view.items().stream().map(this::toResponse).toList());
+        return new CartResponse(view.items().stream().map(this::toResponse).toList(), view.maxItemQuantity(),
+            view.total(), view.totalAvailable());
     }
 
     private CartItemResponse toResponse(CartView.Item item) {
         CartView.ProductSummary summary = item.product();
         ProductSummaryResponse product = summary == null ? null : new ProductSummaryResponse(
                 summary.name(), summary.price(), summary.brand(), summary.imageUrl());
-        return new CartItemResponse(item.productId(), item.quantity(), item.available(), product);
+        return new CartItemResponse(item.productId(), item.quantity(), item.available(), product,
+            item.unitPriceSnapshot(), item.priceAvailable(), item.subtotal());
     }
 }

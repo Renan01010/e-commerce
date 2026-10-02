@@ -8,9 +8,11 @@ import java.util.UUID;
 public final class CartApiModels {
     private CartApiModels() {}
 
-    public record CartResponse(List<CartItemResponse> items) {}
+    public record CartResponse(List<CartItemResponse> items, int maxItemQuantity,
+                               BigDecimal total, boolean totalAvailable) {}
 
-    public record CartItemResponse(UUID productId, int quantity, boolean available, ProductSummaryResponse product) {}
+    public record CartItemResponse(UUID productId, int quantity, boolean available, ProductSummaryResponse product,
+                                   BigDecimal unitPriceSnapshot, boolean priceAvailable, BigDecimal subtotal) {}
 
     public record ProductSummaryResponse(String name, BigDecimal price, String brand, String imageUrl) {}
 

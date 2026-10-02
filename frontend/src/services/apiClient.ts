@@ -64,7 +64,7 @@ export const catalogApi = {
   },
 };
 
-export type CartApiErrorKind = 'unauthenticated' | 'not-found' | 'unavailable' | 'network' | 'unknown';
+export type CartApiErrorKind = 'unauthenticated' | 'not-found' | 'conflict' | 'unavailable' | 'network' | 'unknown';
 
 export class CartApiError extends Error {
   constructor(
@@ -88,6 +88,10 @@ function toCartApiError(error: unknown): CartApiError {
   }
   if (status === 404) {
     return new CartApiError('Este item não está mais disponível no carrinho.', 'not-found', status);
+  }
+  if (status === 409) {
+    const message = (error.response?.data as { message?: string } | undefined)?.message;
+    return new CartApiError(message ?? 'A quantidade excede o limite ou estoque disponível.', 'conflict', status);
   }
   if (status === 503) {
     return new CartApiError('O carrinho está temporariamente indisponível. Tente novamente.', 'unavailable', status);

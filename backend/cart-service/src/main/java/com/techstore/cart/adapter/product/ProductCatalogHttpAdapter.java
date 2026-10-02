@@ -28,7 +28,8 @@ public class ProductCatalogHttpAdapter implements ProductCatalogPort {
                 throw new ProductCatalogUnavailableException("Product Service returned an empty response");
             }
             if (!product.isActive()) return Optional.empty();
-            return Optional.of(new ProductSummary(product.name(), product.price(), product.brand(), product.imageUrl()));
+                return Optional.of(new ProductSummary(product.name(), product.price(), product.brand(),
+                    product.imageUrl(), product.quantity()));
         } catch (HttpClientErrorException.NotFound exception) {
             return Optional.empty();
         } catch (RestClientException exception) {

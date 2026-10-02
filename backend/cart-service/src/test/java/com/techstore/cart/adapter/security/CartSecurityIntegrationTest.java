@@ -27,7 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 @WebMvcTest(CartSecurityIntegrationTest.ProtectedEndpoint.class)
-@Import({SecurityConfig.class, CartOwnerResolver.class, CartExceptionHandler.class, CartAuthenticationErrorWriter.class})
+@Import({SecurityConfig.class, CartOwnerResolver.class, CartExceptionHandler.class,
+    CartAuthenticationErrorWriter.class, CartSecurityIntegrationTest.ProtectedEndpoint.class})
 @TestPropertySource(properties = "techstore.jwt.secret=01234567890123456789012345678901")
 class CartSecurityIntegrationTest {
     private static final String SECRET = "01234567890123456789012345678901";
@@ -59,7 +60,8 @@ class CartSecurityIntegrationTest {
     private static String token(String subject, Instant expiration) {
         byte[] key = SECRET.getBytes(StandardCharsets.UTF_8);
         JwtEncoder encoder = new NimbusJwtEncoder(new ImmutableSecret<>(new SecretKeySpec(key, "HmacSHA256")));
-        Instant issuedAt = Instant.now().minusSeconds(1);
+        Instant now = Instant.now();
+        Instant issuedAt = expiration.isBefore(now) ? expiration.minusSeconds(1) : now.minusSeconds(1);
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(subject)
                 .issuedAt(issuedAt)
@@ -71,7 +73,7 @@ class CartSecurityIntegrationTest {
     }
 
     @RestController
-    static class ProtectedEndpoint {
+    public static class ProtectedEndpoint {
         private final CartOwnerResolver ownerResolver;
 
         ProtectedEndpoint(CartOwnerResolver ownerResolver) {
@@ -79,7 +81,7 @@ class CartSecurityIntegrationTest {
         }
 
         @GetMapping("/api/cart")
-        String getCart(org.springframework.security.core.Authentication authentication) {
+        public String getCart(org.springframework.security.core.Authentication authentication) {
             return ownerResolver.resolve(authentication).toString();
         }
     }

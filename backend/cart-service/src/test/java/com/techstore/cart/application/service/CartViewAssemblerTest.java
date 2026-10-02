@@ -11,13 +11,14 @@ import com.techstore.cart.application.exception.ProductCatalogUnavailableExcepti
 import com.techstore.cart.application.port.out.ProductCatalogPort;
 import com.techstore.cart.application.port.out.ProductCatalogPort.ProductSummary;
 import com.techstore.cart.domain.CartItem;
+import com.techstore.cart.domain.CartItemRules;
+import com.techstore.cart.domain.UnitPriceSnapshot;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,15 +29,21 @@ class CartViewAssemblerTest {
     @Mock
     private ProductCatalogPort productCatalog;
 
-    @InjectMocks
     private CartViewAssembler assembler;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        assembler = new CartViewAssembler(productCatalog, new CartItemRules(99));
+    }
 
     @Test
     void enrichesCartLineWithCurrentProductSummary() {
         when(productCatalog.findActiveById(PRODUCT_ID)).thenReturn(Optional.of(
-                new ProductSummary("Keyboard", new BigDecimal("49.90"), "Acme", "https://example.test/item.jpg")));
+            new ProductSummary("Keyboard", new BigDecimal("49.90"), "Acme",
+                "https://example.test/item.jpg", 10)));
 
-        CartView response = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 2)));
+        CartView response = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 2,
+            UnitPriceSnapshot.known(new BigDecimal("49.90")))));
         CartView.Item item = response.items().getFirst();
 
         assertTrue(item.available());
@@ -44,16 +51,51 @@ class CartViewAssemblerTest {
         assertEquals(2, item.quantity());
         assertEquals("Keyboard", item.product().name());
         assertEquals(new BigDecimal("49.90"), item.product().price());
+        assertEquals(new BigDecimal("99.80"), item.subtotal());
+        assertEquals(new BigDecimal("99.80"), response.total());
     }
+
+        @Test
+        void keepsSnapshotAndSubtotalWhenCatalogPriceChanges() {
+        when(productCatalog.findActiveById(PRODUCT_ID)).thenReturn(Optional.of(
+            new ProductSummary("Keyboard", new BigDecimal("79.90"), "Acme", null, 10)));
+
+        CartView.Item item = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 2,
+            UnitPriceSnapshot.known(new BigDecimal("49.90"))))).items().getFirst();
+
+        assertEquals(new BigDecimal("49.90"), item.product().price());
+        assertEquals(new BigDecimal("99.80"), item.subtotal());
+        }
+
+        @Test
+        void keepsUnknownPriceEvenWhenCatalogCurrentlyHasAnActivePrice() {
+        when(productCatalog.findActiveById(PRODUCT_ID)).thenReturn(Optional.of(
+            new ProductSummary("Keyboard", new BigDecimal("79.90"), "Acme", null, 10)));
+
+        CartView response = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 2,
+            UnitPriceSnapshot.unknown())));
+        CartView.Item item = response.items().getFirst();
+
+        assertTrue(item.available());
+        assertEquals(false, item.priceAvailable());
+        assertEquals(null, item.product().price());
+        assertEquals(null, item.subtotal());
+        assertEquals(null, response.total());
+        assertEquals(false, response.totalAvailable());
+        }
 
     @Test
     void representsInactiveProductWithoutPersistedSummary() {
         when(productCatalog.findActiveById(PRODUCT_ID)).thenReturn(Optional.empty());
 
-        CartView.Item item = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 1))).items().getFirst();
+        CartView response = assembler.assemble(List.of(new CartItem(PRODUCT_ID, 1,
+            UnitPriceSnapshot.unknown())));
+        CartView.Item item = response.items().getFirst();
 
         assertEquals(false, item.available());
         assertNull(item.product());
+        assertEquals(null, item.subtotal());
+        assertEquals(false, response.totalAvailable());
     }
 
     @Test
@@ -62,6 +104,6 @@ class CartViewAssemblerTest {
                 .thenThrow(new ProductCatalogUnavailableException("catalog unavailable"));
 
         assertThrows(ProductCatalogUnavailableException.class,
-                () -> assembler.assemble(List.of(new CartItem(PRODUCT_ID, 1))));
+            () -> assembler.assemble(List.of(new CartItem(PRODUCT_ID, 1, UnitPriceSnapshot.unknown()))));
     }
 }

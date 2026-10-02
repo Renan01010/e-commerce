@@ -7,6 +7,9 @@ export type CartStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 interface CartState {
   items: CartItem[];
+  maxItemQuantity: number;
+  total: number | null;
+  totalAvailable: boolean;
   status: CartStatus;
   error: string | null;
   successMessage: string | null;
@@ -30,9 +33,19 @@ let pendingLoad: PendingLoad | null = null;
 let requestVersion = 0;
 let expirationTimer: ReturnType<typeof setTimeout> | undefined;
 
-const positiveCartQuantity = (quantity: number) => Number.isInteger(quantity)
+const positiveCartQuantity = (quantity: number, maximum: number) => Number.isInteger(quantity)
   && quantity > 0
-  && quantity <= 2_147_483_647;
+  && quantity <= maximum;
+
+function totalForItems(items: CartItem[]) {
+  if (items.some((item) => !item.priceAvailable || item.subtotal === null)) {
+    return { total: null, totalAvailable: false };
+  }
+  return {
+    total: items.reduce((total, item) => total + (item.subtotal ?? 0), 0),
+    totalAvailable: true,
+  };
+}
 
 function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : 'O carrinho não pôde ser atualizado. Tente novamente.';
@@ -48,6 +61,9 @@ function resetForSession(session: typeof activeSession) {
 
   useCartStore.setState({
     items: [],
+    maxItemQuantity: 99,
+    total: 0,
+    totalAvailable: true,
     status: 'idle',
     error: null,
     successMessage: null,
@@ -98,8 +114,20 @@ async function runMutation(
   try {
     const response = await request();
     if (generation === requestVersion && activeSession === session) {
+        const items = applyResponse(response);
+        const cartResponse = response && typeof response === 'object' && 'items' in response
+          ? response as CartResponse
+          : null;
+        const financialState = cartResponse
+          ? {
+            maxItemQuantity: cartResponse.maxItemQuantity,
+            total: cartResponse.total,
+            totalAvailable: cartResponse.totalAvailable,
+          }
+          : { maxItemQuantity: useCartStore.getState().maxItemQuantity, ...totalForItems(items) };
       useCartStore.setState({
-        items: applyResponse(response),
+          items,
+          ...financialState,
         status: 'loaded',
         error: null,
         successMessage,
@@ -133,6 +161,9 @@ async function runMutation(
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  maxItemQuantity: 99,
+  total: 0,
+  totalAvailable: true,
   status: 'idle',
   error: null,
   successMessage: null,
@@ -152,7 +183,14 @@ export const useCartStore = create<CartState>((set, get) => ({
       try {
         const response = await cartApi.getCart();
         if (requestId === requestVersion && activeSession === session) {
-          set({ items: response.items, status: 'loaded', error: null });
+          set({
+            items: response.items,
+            maxItemQuantity: response.maxItemQuantity,
+            total: response.total,
+            totalAvailable: response.totalAvailable,
+            status: 'loaded',
+            error: null,
+          });
         }
       } catch (error) {
         if (requestId === requestVersion && activeSession === session) {
@@ -171,8 +209,13 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   addItem: (request) => {
-    if (!positiveCartQuantity(request.quantity)) {
-      set({ error: 'Informe uma quantidade inteira positiva.' });
+    const { maxItemQuantity, items } = get();
+    const currentQuantity = items.find((item) => item.productId === request.productId)?.quantity ?? 0;
+    if (!positiveCartQuantity(request.quantity, maxItemQuantity)
+      || currentQuantity + request.quantity > maxItemQuantity) {
+      set({ error: Number.isInteger(request.quantity) && request.quantity > 0
+        ? `A quantidade máxima por produto é ${maxItemQuantity}.`
+        : 'Informe uma quantidade inteira positiva.' });
       return Promise.resolve(false);
     }
     return runMutation(
@@ -184,8 +227,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   setQuantity: (productId, quantity) => {
-    if (!positiveCartQuantity(quantity)) {
-      set({ error: 'Informe uma quantidade inteira positiva.' });
+    const { maxItemQuantity } = get();
+    if (!positiveCartQuantity(quantity, maxItemQuantity)) {
+      set({ error: Number.isInteger(quantity) && quantity > 0
+        ? `A quantidade máxima por produto é ${maxItemQuantity}.`
+        : 'Informe uma quantidade inteira positiva.' });
       return Promise.resolve(false);
     }
     return runMutation(
@@ -198,9 +244,12 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   removeItem: (productId) => runMutation(
     `remove:${productId}`,
-    () => cartApi.removeItem(productId),
+    async () => {
+      await cartApi.removeItem(productId);
+      return cartApi.getCart();
+    },
     'Produto removido do carrinho.',
-    () => get().items.filter((item) => item.productId !== productId),
+    (response) => (response as CartResponse).items,
   ),
 
   clearCart: () => runMutation(

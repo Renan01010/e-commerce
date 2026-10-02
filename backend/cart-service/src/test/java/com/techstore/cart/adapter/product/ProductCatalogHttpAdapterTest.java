@@ -43,7 +43,7 @@ class ProductCatalogHttpAdapterTest {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {"id":"550e8400-e29b-41d4-a716-446655440000","name":"Keyboard","price":49.90,
-                         "brand":"Acme","quantity":0,"imageUrl":"https://example.test/keyboard.jpg","isActive":true}
+                         "brand":"Acme","quantity":12,"imageUrl":"https://example.test/keyboard.jpg","isActive":true}
                         """, MediaType.APPLICATION_JSON));
 
         ProductSummary product = adapter.findActiveById(PRODUCT_ID).orElseThrow();
@@ -52,6 +52,7 @@ class ProductCatalogHttpAdapterTest {
         assertEquals(new BigDecimal("49.90"), product.price());
         assertEquals("Acme", product.brand());
         assertEquals("https://example.test/keyboard.jpg", product.imageUrl());
+        assertEquals(12, product.availableStock());
         server.verify();
     }
 

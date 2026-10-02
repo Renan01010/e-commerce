@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.techstore.cart.application.port.out.CartStorePort;
 import com.techstore.cart.domain.CartItem;
+import com.techstore.cart.domain.UnitPriceSnapshot;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class CartConcurrentAddIntegrationTest {
     private static final int WORKERS = 8;
     private static final int ADDS_PER_WORKER = 5;
+    private static final UnitPriceSnapshot PRICE = UnitPriceSnapshot.known(new BigDecimal("12.34"));
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -53,7 +56,7 @@ class CartConcurrentAddIntegrationTest {
                 futures.add(executor.submit(() -> {
                         start.await();
                         for (int add = 0; add < ADDS_PER_WORKER; add++) {
-                            cartStore.add(ownerUserId, productId, 1);
+                            cartStore.add(ownerUserId, productId, 1, PRICE, 40, 40);
                         }
                         return null;
                     }));

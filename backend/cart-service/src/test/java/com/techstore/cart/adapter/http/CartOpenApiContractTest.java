@@ -18,11 +18,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springdoc.core.properties.SpringDocConfigProperties;
+import org.springdoc.core.configuration.SpringDocConfiguration;
+import org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({CartController.class, CartQueryController.class, CartItemController.class})
+@ImportAutoConfiguration({SpringDocConfiguration.class, SpringDocWebMvcConfiguration.class})
+@EnableConfigurationProperties(SpringDocConfigProperties.class)
 @Import({OpenApiConfiguration.class, SecurityConfig.class, CartOwnerResolver.class,
         CartExceptionHandler.class, CartAuthenticationErrorWriter.class})
 @TestPropertySource(properties = "techstore.jwt.secret=01234567890123456789012345678901")
@@ -44,16 +51,32 @@ class CartOpenApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.servers[0].url").value("http://localhost:8080/api"))
                 .andExpect(jsonPath("$.paths['/cart'].get").exists())
+                .andExpect(jsonPath("$.paths['/cart'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/cart'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/cart'].get.responses['503']").exists())
                 .andExpect(jsonPath("$.paths['/cart'].delete").exists())
+                .andExpect(jsonPath("$.paths['/cart'].delete.responses['204']").exists())
                 .andExpect(jsonPath("$.paths['/cart/items'].post").exists())
                 .andExpect(jsonPath("$.paths['/cart/items'].post.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/cart/items'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/cart/items'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/cart/items'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/cart/items'].post.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/cart/items'].post.requestBody.content['application/json'].schema.$ref").exists())
                 .andExpect(jsonPath("$.paths['/cart/items/{productId}'].put").exists())
+                .andExpect(jsonPath("$.paths['/cart/items/{productId}'].put.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/cart/items/{productId}'].put.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/cart/items/{productId}'].put.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/cart/items/{productId}'].delete").exists())
+                .andExpect(jsonPath("$.paths['/cart/items/{productId}'].delete.responses['204']").exists())
                 .andExpect(jsonPath("$.components.securitySchemes.BearerAuth.scheme").value("bearer"))
                 .andExpect(jsonPath("$.components.schemas.CartResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.CartResponse.properties.maxItemQuantity").exists())
+                .andExpect(jsonPath("$.components.schemas.CartResponse.properties.total").exists())
+                .andExpect(jsonPath("$.components.schemas.CartResponse.properties.totalAvailable").exists())
+                .andExpect(jsonPath("$.components.schemas.CartItemResponse.properties.unitPriceSnapshot").exists())
+                .andExpect(jsonPath("$.components.schemas.CartItemResponse.properties.priceAvailable").exists())
+                .andExpect(jsonPath("$.components.schemas.CartItemResponse.properties.subtotal").exists())
                 .andExpect(jsonPath("$.security[0].BearerAuth").isArray());
     }
 }

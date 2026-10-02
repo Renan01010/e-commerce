@@ -10,6 +10,7 @@ import com.techstore.cart.adapter.security.CartOwnerResolver;
 import com.techstore.cart.adapter.security.SecurityConfig;
 import com.techstore.cart.application.model.CartView;
 import com.techstore.cart.application.service.GetCartService;
+import com.techstore.cart.domain.UnitPriceSnapshot;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -56,8 +57,30 @@ class CartQueryControllerTest {
                 .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.items[0].available").value(true))
+                .andExpect(jsonPath("$.items[0].unitPriceSnapshot").value(49.90))
+                .andExpect(jsonPath("$.items[0].priceAvailable").value(true))
+                .andExpect(jsonPath("$.items[0].subtotal").value(99.80))
                 .andExpect(jsonPath("$.items[0].product.name").value("Keyboard"))
-                .andExpect(jsonPath("$.items[0].product.price").value(49.90));
+                .andExpect(jsonPath("$.items[0].product.price").value(49.90))
+                .andExpect(jsonPath("$.maxItemQuantity").value(99))
+                .andExpect(jsonPath("$.total").value(99.80))
+                .andExpect(jsonPath("$.totalAvailable").value(true));
+            }
+
+            @Test
+            void marksUnknownLegacyPriceAndCartTotalAsUnavailable() throws Exception {
+            when(getCartService.getCart(OWNER_ID)).thenReturn(new CartView(List.of(
+                new CartView.Item(PRODUCT_ID, 1, false, null, UnitPriceSnapshot.unknown())), 4));
+
+            mockMvc.perform(get("/api/cart").with(jwt().jwt(token -> token.subject(OWNER_ID.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].available").value(false))
+                .andExpect(jsonPath("$.items[0].unitPriceSnapshot").doesNotExist())
+                .andExpect(jsonPath("$.items[0].priceAvailable").value(false))
+                .andExpect(jsonPath("$.items[0].subtotal").doesNotExist())
+                .andExpect(jsonPath("$.total").doesNotExist())
+                .andExpect(jsonPath("$.totalAvailable").value(false))
+                .andExpect(jsonPath("$.maxItemQuantity").value(4));
     }
 
     @Test

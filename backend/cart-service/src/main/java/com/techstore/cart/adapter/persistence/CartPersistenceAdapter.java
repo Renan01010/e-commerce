@@ -2,6 +2,7 @@ package com.techstore.cart.adapter.persistence;
 
 import com.techstore.cart.application.port.out.CartStorePort;
 import com.techstore.cart.domain.CartItem;
+import com.techstore.cart.domain.UnitPriceSnapshot;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,10 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CartPersistenceAdapter implements CartStorePort {
     private static final String ADD_ITEM_SQL = """
-            insert into cart_items (owner_user_id, product_id, quantity)
-            values (?, ?, ?)
+                        insert into cart_items (owner_user_id, product_id, quantity, unit_price, price_snapshot_status)
+                        select ?, ?, ?, ?, 'KNOWN'
+                        where ? <= ? and ? <= ?
             on conflict (owner_user_id, product_id)
-            do update set quantity = cart_items.quantity + excluded.quantity
+                        do update set quantity = cart_items.quantity + excluded.quantity,
+                                                    unit_price = excluded.unit_price,
+                                                    price_snapshot_status = 'KNOWN'
+                        where cart_items.quantity + excluded.quantity <= ?
+                            and cart_items.quantity + excluded.quantity <= ?
             returning quantity, (xmax = 0) as created
             """;
 
@@ -36,17 +42,56 @@ public class CartPersistenceAdapter implements CartStorePort {
     }
 
     @Override
-    public AddResult add(UUID ownerUserId, UUID productId, int quantity) {
-        return jdbcTemplate.queryForObject(ADD_ITEM_SQL,
-                (resultSet, rowNumber) -> new AddResult(
-                        new CartItem(productId, resultSet.getInt("quantity")),
-                        resultSet.getBoolean("created")),
-                ownerUserId, productId, quantity);
+        public List<LegacyCartItem> findPendingPriceSnapshots() {
+        return cartItems.findAllByPriceSnapshotStatus("PENDING").stream()
+            .map(entity -> new LegacyCartItem(entity.getId().getOwnerUserId(),
+                entity.getId().getProductId(), entity.getQuantity()))
+            .toList();
     }
 
     @Override
-    public boolean setQuantity(UUID ownerUserId, UUID productId, int quantity) {
-        return cartItems.updateOwnedQuantity(ownerUserId, productId, quantity) == 1;
+        public boolean resolvePendingPriceSnapshot(UUID ownerUserId, UUID productId,
+                               UnitPriceSnapshot priceSnapshot) {
+        return cartItems.resolvePendingPriceSnapshot(ownerUserId, productId, priceSnapshot.amount(),
+            priceSnapshot.status().name()) == 1;
+        }
+
+        @Override
+        public AddResult add(UUID ownerUserId, UUID productId, int quantity, UnitPriceSnapshot priceSnapshot,
+                 int maxQuantity, int availableStock) {
+        if (priceSnapshot.status() != UnitPriceSnapshot.Status.KNOWN) {
+            throw new IllegalArgumentException("New cart items require a known price snapshot");
+        }
+        List<AddResult> results = jdbcTemplate.query(ADD_ITEM_SQL,
+            (resultSet, rowNumber) -> new AddResult(
+                new CartItem(productId, resultSet.getInt("quantity"), priceSnapshot),
+                resultSet.getBoolean("created")),
+            ownerUserId, productId, quantity, priceSnapshot.amount(), quantity, maxQuantity,
+            quantity, availableStock, maxQuantity, availableStock);
+        if (!results.isEmpty()) return results.getFirst();
+
+        Integer currentQuantity = cartItems.findOwnedQuantity(ownerUserId, productId);
+        long resultingQuantity = (currentQuantity == null ? 0L : currentQuantity.longValue()) + quantity;
+        if (resultingQuantity > maxQuantity) return AddResult.rejected(WriteRejection.MAX_QUANTITY);
+        if (resultingQuantity > availableStock) return AddResult.rejected(WriteRejection.INSUFFICIENT_STOCK);
+        throw new IllegalStateException("Cart upsert did not return an outcome");
+        }
+
+        @Override
+        public SetQuantityResult setQuantity(UUID ownerUserId, UUID productId, int quantity,
+                                             UnitPriceSnapshot priceSnapshot, int maxQuantity, int availableStock) {
+        if (priceSnapshot.status() != UnitPriceSnapshot.Status.KNOWN) {
+            throw new IllegalArgumentException("Updated cart items require a known price snapshot");
+        }
+            if (cartItems.updateOwnedQuantity(ownerUserId, productId, quantity, priceSnapshot.amount(),
+                    maxQuantity, availableStock) == 1) {
+                return SetQuantityResult.success();
+            }
+            Integer currentQuantity = cartItems.findOwnedQuantity(ownerUserId, productId);
+            if (currentQuantity == null) return SetQuantityResult.missing();
+            if (quantity > maxQuantity) return SetQuantityResult.rejected(WriteRejection.MAX_QUANTITY);
+            if (quantity > availableStock) return SetQuantityResult.rejected(WriteRejection.INSUFFICIENT_STOCK);
+            throw new IllegalStateException("Cart quantity update did not return an outcome");
     }
 
     @Override

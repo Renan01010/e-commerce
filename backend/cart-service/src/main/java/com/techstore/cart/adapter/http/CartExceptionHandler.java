@@ -2,7 +2,9 @@ package com.techstore.cart.adapter.http;
 
 import com.techstore.cart.adapter.http.CartApiModels.ErrorResponse;
 import com.techstore.cart.application.exception.CartItemNotFoundException;
+import com.techstore.cart.application.exception.CartQuantityLimitExceededException;
 import com.techstore.cart.application.exception.InvalidCartOwnerException;
+import com.techstore.cart.application.exception.InsufficientProductStockException;
 import com.techstore.cart.application.exception.ProductCatalogUnavailableException;
 import com.techstore.cart.application.exception.ProductNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +30,11 @@ public class CartExceptionHandler {
     @ExceptionHandler({CartItemNotFoundException.class, ProductNotFoundException.class})
     ResponseEntity<ErrorResponse> notFound(RuntimeException exception, HttpServletRequest request) {
         return response(HttpStatus.NOT_FOUND, "Cart item or product not found", request);
+    }
+
+    @ExceptionHandler({CartQuantityLimitExceededException.class, InsufficientProductStockException.class})
+    ResponseEntity<ErrorResponse> conflict(RuntimeException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request);
     }
 
     @ExceptionHandler(ProductCatalogUnavailableException.class)

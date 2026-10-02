@@ -1,0 +1,185 @@
+openapi: 3.1.0
+info:
+  title: Cart API response contract
+  version: 1.1.0
+  description: Additive response contract for the existing authenticated Cart endpoints. Paths and existing success statuses remain unchanged.
+paths:
+  /api/cart:
+    get:
+      summary: Read the authenticated owner's cart
+      responses:
+        '200':
+          description: Cart; total is null if any line has unknown legacy price
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Missing or invalid JWT
+        '503':
+          description: Product catalog unavailable
+    delete:
+      summary: Clear the authenticated owner's cart
+      responses:
+        '204':
+          description: Cleared or already empty
+        '401':
+          description: Missing or invalid JWT
+  /api/cart/items:
+    post:
+      summary: Add a product or increment the existing line
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '201':
+          description: New line created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '200':
+          description: Existing line incremented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: Product missing or inactive
+        '409':
+          description: Resulting quantity exceeds configured maximum or available stock
+        '503':
+          description: Product catalog unavailable
+  /api/cart/items/{productId}:
+    put:
+      summary: Replace the quantity of an owned line
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Quantity and price snapshot updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: Owned line or active product not found
+        '409':
+          description: Quantity exceeds configured maximum or available stock
+        '503':
+          description: Product catalog unavailable
+    delete:
+      summary: Remove an owned line, including an unknown-price legacy line
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Line removed
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: Owned line not found
+components:
+  schemas:
+    CartResponse:
+      type: object
+      required: [items, maxItemQuantity, total, totalAvailable]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        maxItemQuantity:
+          type: integer
+          minimum: 1
+          description: Effective configured maximum for a product line.
+        total:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.01
+          description: Sum of subtotals; null if any line has unknown price.
+        totalAvailable:
+          type: boolean
+          description: False while at least one line has unknown price.
+    CartItemResponse:
+      type: object
+      required: [productId, quantity, available, product, unitPriceSnapshot, priceAvailable, subtotal]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          description: Must not exceed the effective maxItemQuantity returned by the cart; initial default is 99.
+        available:
+          type: boolean
+          description: Product active/catalog availability; independent of price availability.
+        product:
+          oneOf:
+            - $ref: '#/components/schemas/ProductSummaryResponse'
+            - type: 'null'
+        unitPriceSnapshot:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.01
+        priceAvailable:
+          type: boolean
+        subtotal:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.01
+          description: Snapshot multiplied by quantity; null when price is unknown.
+    ProductSummaryResponse:
+      type: object
+      required: [name, price, brand, imageUrl]
+      properties:
+        name:
+          type: string
+        price:
+          type: [number, 'null']
+          description: Mirrors the persisted snapshot when known; never substitutes live price for an unknown snapshot.
+        brand:
+          type: [string, 'null']
+        imageUrl:
+          type: [string, 'null']

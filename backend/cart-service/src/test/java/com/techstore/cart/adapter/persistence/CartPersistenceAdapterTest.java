@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.techstore.cart.application.port.out.CartStorePort;
+import com.techstore.cart.domain.UnitPriceSnapshot;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ class CartPersistenceAdapterTest {
     private static final UUID OWNER_A = UUID.fromString("550e8400-e29b-41d4-a716-446655440010");
     private static final UUID OWNER_B = UUID.fromString("550e8400-e29b-41d4-a716-446655440011");
     private static final UUID PRODUCT_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    private static final UnitPriceSnapshot PRICE = UnitPriceSnapshot.known(new java.math.BigDecimal("12.34"));
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -46,8 +48,8 @@ class CartPersistenceAdapterTest {
 
     @Test
     void upsertsOneLineAndAddsQuantitiesForTheSameOwner() {
-        CartStorePort.AddResult inserted = cartStore.add(OWNER_A, PRODUCT_ID, 2);
-        CartStorePort.AddResult consolidated = cartStore.add(OWNER_A, PRODUCT_ID, 3);
+        CartStorePort.AddResult inserted = cartStore.add(OWNER_A, PRODUCT_ID, 2, PRICE, 99, 10);
+        CartStorePort.AddResult consolidated = cartStore.add(OWNER_A, PRODUCT_ID, 3, PRICE, 99, 10);
 
         assertTrue(inserted.created());
         assertFalse(consolidated.created());
@@ -57,8 +59,8 @@ class CartPersistenceAdapterTest {
 
     @Test
     void isolatesIdenticalProductAcrossOwners() {
-        cartStore.add(OWNER_A, PRODUCT_ID, 2);
-        cartStore.add(OWNER_B, PRODUCT_ID, 4);
+        cartStore.add(OWNER_A, PRODUCT_ID, 2, PRICE, 99, 10);
+        cartStore.add(OWNER_B, PRODUCT_ID, 4, PRICE, 99, 10);
 
         assertEquals(2, cartStore.findByOwner(OWNER_A).getFirst().quantity());
         assertEquals(4, cartStore.findByOwner(OWNER_B).getFirst().quantity());
@@ -70,5 +72,25 @@ class CartPersistenceAdapterTest {
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> cartItemJpaRepository.saveAndFlush(invalidItem));
+    }
+
+    @Test
+    void rejectsConcurrentAddAboveConfiguredMaximumWithoutChangingLine() {
+        cartStore.add(OWNER_A, PRODUCT_ID, 98, PRICE, 99, 100);
+
+        CartStorePort.AddResult rejected = cartStore.add(OWNER_A, PRODUCT_ID, 2, PRICE, 99, 100);
+
+        assertEquals(CartStorePort.WriteRejection.MAX_QUANTITY, rejected.rejection());
+        assertEquals(98, cartStore.findByOwner(OWNER_A).getFirst().quantity());
+    }
+
+    @Test
+    void rejectsAddAboveStockWithoutChangingLine() {
+        cartStore.add(OWNER_A, PRODUCT_ID, 3, PRICE, 99, 5);
+
+        CartStorePort.AddResult rejected = cartStore.add(OWNER_A, PRODUCT_ID, 3, PRICE, 99, 5);
+
+        assertEquals(CartStorePort.WriteRejection.INSUFFICIENT_STOCK, rejected.rejection());
+        assertEquals(3, cartStore.findByOwner(OWNER_A).getFirst().quantity());
     }
 }

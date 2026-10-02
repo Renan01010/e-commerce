@@ -7,5 +7,5 @@ import java.util.UUID;
 public interface ProductCatalogPort {
     Optional<ProductSummary> findActiveById(UUID productId);
 
-    record ProductSummary(String name, BigDecimal price, String brand, String imageUrl) {}
+    record ProductSummary(String name, BigDecimal price, String brand, String imageUrl, int availableStock) {}
 }
