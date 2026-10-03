@@ -16,6 +16,17 @@ O escopo inclui cadastro, confirmação de e-mail, login, logout, recuperação 
 
 Esta feature não transforma a vitrine em um fluxo de compra transacional. Checkout, pagamentos, pedidos, envio, rastreamento e reserva de estoque permanecem fora do escopo.
 
+## Clarifications
+
+### Session 2026-10-03
+
+- Q: Se o envio do e-mail de confirmação falhar logo após um cadastro válido, a conta deve continuar criada como não verificada para que o usuário possa pedir outro link, ou o cadastro deve ser desfeito? → A: Manter a conta não verificada e permitir reenvio.
+- Q: Por quanto tempo um link de redefinição de senha deve permanecer válido antes de expirar? → A: 1 hora.
+- Q: Por quanto tempo o link de confirmação de e-mail deve permanecer válido antes de expirar? → A: 24 horas.
+- Q: Depois que uma senha é redefinida, o que deve acontecer com sessões JWT que já estavam abertas em outros dispositivos? → A: Invalidar as sessões antigas imediatamente; o usuário deve autenticar novamente.
+- Q: Quando a nova verificação de e-mail for adicionada, como devemos tratar contas que já existem e ainda não têm um estado de verificação registrado? → A: Exigir confirmação do e-mail antes do próximo login.
+- Q: Para invalidar de imediato JWTs antigos em todos os serviços após redefinir uma senha, qual direção deve prevalecer? → A: Permitir adaptar a validação no Cart e Product Service e usar revogação centralizada por usuário.
+
 ## Levantamento inicial do repositório
 
 Este inventário registra o estado observado durante a especificação; a fase de planejamento deve confirmar os contratos e configurações completos antes de propor alterações.
@@ -41,16 +52,16 @@ Este inventário registra o estado observado durante a especificação; a fase d
 
 ### Migrations, configuração, riscos e testes a tratar no plano
 
-- **Migrations**: confirmar migrations e schema no ambiente de destino. Se os dados ainda não existirem, criar migrations Flyway novas e versionadas para os campos e registros de tokens necessários; nunca alterar migrations já aplicadas.
+- **Migrations**: confirmar migrations e schema no ambiente de destino. Se os dados ainda não existirem, criar migrations Flyway novas e versionadas para os campos e registros de tokens necessários; tratar contas preexistentes sem prova de confirmação como não verificadas; nunca alterar migrations já aplicadas.
 - **Configuração**: manter `TECHSTORE_JWT_SECRET` e as configurações de conexão atuais fora do código. Documentar as variáveis de ambiente do provedor de e-mail, incluindo host, porta, usuário, senha, remetente e nome do remetente quando aplicável. Não versionar credenciais.
-- **Riscos**: uma sessão JWT sem mecanismo de revogação continua válida até sua expiração depois que o frontend executa logout; tokens de uso único e respostas uniformes são necessários para reduzir replay e enumeração de contas; falha ou configuração incorreta de e-mail pode impedir a confirmação/recuperação; alterações no schema do usuário devem preservar o cadastro e os tokens atuais.
+- **Riscos**: uma sessão JWT sem mecanismo de revogação continua válida até sua expiração depois que o frontend executa logout; invalidar imediatamente sessões após redefinição exige integração de validação entre User, Cart e Product Services, com custo de latência e dependência de disponibilidade; tokens de uso único e respostas uniformes são necessários para reduzir replay e enumeração de contas; falha ou configuração incorreta de e-mail pode impedir a confirmação/recuperação; alterações no schema do usuário devem preservar o cadastro e os tokens atuais.
 - **Testes necessários**: cobrir cadastro e validação; login e compatibilidade JWT; confirmação, expiração, reuso e reenvio de tokens; recuperação e redefinição; alteração de senha; perfil e autorização; logout; isolamento entre usuários no carrinho; rotas frontend protegidas e públicas; estados de erro/loading; adapter de e-mail simulado, sem depender de SMTP real.
 
 ## Restrições e limites
 
 - Evoluir o User Service existente; não criar outro serviço de usuários.
 - Preservar o mecanismo JWT e os contratos existentes sempre que possível.
-- O User Service continua responsável por conta, autenticação, credenciais, verificação, recuperação e perfil. O Cart Service continua sendo a fonte de verdade do carrinho. O Product Service não deve ser alterado.
+- O User Service continua responsável por conta, autenticação, credenciais, verificação, recuperação, perfil e estado central de revogação. O Cart Service continua sendo a fonte de verdade do carrinho. Alterações em Cart e Product Services ficam limitadas à validação da revogação de JWT; nenhuma regra de catálogo ou carrinho muda.
 - A identificação do usuário e o isolamento de dados devem ser aplicados no backend; ocultar telas no frontend não substitui autorização.
 - Usar envio externo de e-mail configurável. Não criar servidor próprio, newsletter ou mensagens de marketing.
 - Nunca armazenar senha em texto puro. Não persistir tokens de verificação/recuperação em texto puro.
@@ -76,6 +87,7 @@ Como visitante, quero criar uma conta com meu nome, e-mail e senha para usar os 
 2. **Given** um e-mail já utilizado, **When** o visitante tenta cadastrar outra conta com esse e-mail, **Then** o cadastro é recusado sem criar outra conta.
 3. **Given** campos ausentes, e-mail inválido, senha fora da política ou confirmação divergente, **When** o visitante envia o formulário, **Then** os erros são apresentados junto aos campos e nenhum cadastro é criado.
 4. **Given** um cadastro público, **When** o cliente envia campos adicionais para escolher role ou estado da conta, **Then** não pode atribuir privilégios ou contornar os controles do serviço.
+5. **Given** uma conta válida foi criada mas o provedor de e-mail está indisponível, **When** o envio da confirmação falha, **Then** a conta permanece não verificada e o usuário pode solicitar novo envio sem repetir o cadastro.
 
 ### User Story 2 - Confirmar e-mail (Priority: P1)
 
@@ -91,6 +103,7 @@ Como usuário recém-cadastrado, quero confirmar meu e-mail e poder pedir outro 
 2. **Given** um token válido e não utilizado, **When** o usuário confirma o endereço, **Then** a conta passa a indicar e-mail verificado e o token deixa de ser utilizável.
 3. **Given** token expirado, inválido ou já utilizado, **When** o usuário tenta confirmar o endereço, **Then** nenhuma conta é alterada e a interface oferece orientação segura para solicitar novo link.
 4. **Given** qualquer token de confirmação armazenado, **When** os dados persistidos são inspecionados, **Then** não é possível recuperar o token original a partir do valor armazenado.
+5. **Given** uma conta criada antes desta feature sem estado de verificação registrado, **When** a nova política entra em vigor, **Then** o e-mail é tratado como não verificado e a conta deve confirmá-lo antes de voltar a iniciar sessão.
 
 ### User Story 3 - Entrar na conta (Priority: P1)
 
@@ -136,6 +149,7 @@ Como usuário que esqueceu a senha, quero solicitar um link de recuperação e d
 3. **Given** token válido e não utilizado e uma nova senha válida, **When** o usuário conclui a redefinição, **Then** a senha é atualizada com hash seguro e o token é invalidado.
 4. **Given** token expirado, inválido ou utilizado, **When** o usuário tenta redefinir a senha, **Then** nenhuma senha é alterada e o usuário recebe orientação segura para reiniciar o fluxo.
 5. **Given** solicitação de recuperação para e-mail não cadastrado ou indisponibilidade do provedor, **When** o sistema processa o pedido, **Then** a resposta visível preserva a política antienumeração e a falha operacional pode ser diagnosticada sem registrar dados sensíveis.
+6. **Given** uma redefinição de senha concluída, **When** a conta possui sessões JWT emitidas anteriormente, **Then** essas sessões deixam de autorizar requisições imediatamente e o usuário deve autenticar-se novamente.
 
 ### User Story 6 - Consultar e editar perfil (Priority: P2)
 
@@ -201,10 +215,11 @@ Como visitante ou usuário autenticado, quero ver opções de navegação adequa
 - E-mail com espaços ou letras maiúsculas deve continuar seguindo a normalização existente antes de comparação e persistência.
 - Solicitações repetidas de cadastro, confirmação ou recuperação não devem criar tokens simultâneos reutilizáveis nem revelar se um e-mail existe.
 - Um token temporário não pode ser aceito após expirar, após uso, nem após outro token vigente substituí-lo, conforme a política decidida no planejamento.
-- Falha do provedor de e-mail não pode produzir uma resposta que afirme falsamente que a mensagem foi entregue; o usuário deve receber orientação segura para tentar novamente.
+- Falha do provedor de e-mail não pode produzir uma resposta que afirme falsamente que a mensagem foi entregue; no cadastro, a conta permanece não verificada e o usuário recebe orientação segura para solicitar novo envio.
 - Um erro durante a redefinição não pode invalidar uma senha correta sem concluir a operação de forma consistente.
 - Campos desconhecidos no cadastro ou perfil não podem conceder role, ativar contas, trocar e-mail ou alterar dados de outra conta.
 - Expiração de sessão durante consulta, edição de perfil ou carrinho deve limpar o estado local e não preservar conteúdo privado visível.
+- A redefinição de senha invalida todas as sessões JWT anteriores; tentativas posteriores com esses tokens devem ser negadas e exigir novo login.
 - Logout nunca deve apagar o carrinho armazenado no backend.
 - Layout responsivo e acessibilidade por teclado devem manter campos, mensagens, estados de carregamento e ações essenciais disponíveis nas telas de conta.
 
@@ -216,12 +231,12 @@ Como visitante ou usuário autenticado, quero ver opções de navegação adequa
 - **FR-002**: O cadastro público DEVE aceitar nome, e-mail, senha e confirmação de senha; validar obrigatoriedade, formato, política de senha e coincidência da confirmação; e criar somente uma conta USER.
 - **FR-003**: O sistema DEVE recusar e-mail já cadastrado sem criar outra conta e sem revelar hashes, senhas ou dados internos.
 - **FR-004**: O sistema DEVE manter senha apenas em forma de hash seguro em repouso e comparar credenciais sem expor a senha em respostas, logs ou dados do frontend.
-- **FR-005**: O sistema DEVE indicar inicialmente que o e-mail da conta não foi verificado e oferecer confirmação por link temporário e solicitação de reenvio.
-- **FR-006**: Tokens de confirmação e recuperação DEVEM ser temporários, de uso único, invalidados após uso e armazenados sem persistir seus valores originais em texto puro.
+- **FR-005**: O sistema DEVE indicar inicialmente que o e-mail da conta não foi verificado e oferecer confirmação por link temporário e solicitação de reenvio. Contas existentes sem estado de verificação registrado DEVEM ser tratadas como não verificadas.
+- **FR-006**: Tokens de confirmação e recuperação DEVEM ser temporários, de uso único, invalidados após uso e armazenados sem persistir seus valores originais em texto puro. O token de confirmação de e-mail DEVE expirar 24 horas após sua emissão; o token de redefinição de senha DEVE expirar uma hora após sua emissão.
 - **FR-007**: O sistema DEVE permitir login com e-mail e senha através do mecanismo JWT existente somente para contas ativas com e-mail verificado e manter a sessão no frontend de acordo com o comportamento atual, sem persistir senha.
 - **FR-008**: Falhas de autenticação DEVEM apresentar resposta que não diferencie e-mail inexistente, senha incorreta ou estado de conta não elegível.
 - **FR-009**: O sistema DEVE permitir logout no dispositivo removendo sessão e estado dependente no frontend sem apagar o carrinho persistido; não deve afirmar revogação de JWT stateless se não existir mecanismo atual de revogação.
-- **FR-010**: O sistema DEVE oferecer solicitação de recuperação, emissão de instruções por e-mail e redefinição com token de uso único e senha válida.
+- **FR-010**: O sistema DEVE oferecer solicitação de recuperação, emissão de instruções por e-mail e redefinição com token de uso único e senha válida. Após uma redefinição concluída, todas as sessões JWT emitidas anteriormente para a conta DEVEM ser invalidadas imediatamente em User, Cart e Product Services e exigir novo login.
 - **FR-011**: Respostas de solicitação de recuperação DEVEM evitar enumeração de usuários independentemente da existência da conta solicitada.
 - **FR-012**: O sistema DEVE permitir que o usuário autenticado altere sua senha mediante validação da senha atual, política da nova senha e confirmação.
 - **FR-013**: O perfil autenticado DEVE permitir consulta de nome, e-mail, estado de verificação e demais informações básicas não sensíveis explicitamente aprovadas.
@@ -231,13 +246,15 @@ Como visitante ou usuário autenticado, quero ver opções de navegação adequa
 - **FR-017**: O header DEVE apresentar opções de entrada/cadastro para visitantes e opções de conta/logout para usuários autenticados, preservando o badge existente do carrinho e sua fonte de estado.
 - **FR-018**: As telas de conta DEVEM seguir a identidade dark/tech das Features 012 e 013, ser responsivas e acessíveis e apresentar estados de carregamento, sucesso, erro, validação, sessão expirada e usuário não autenticado quando aplicáveis.
 - **FR-019**: O envio de confirmação, reenvio e recuperação DEVE usar um provedor externo configurável através de variáveis de ambiente, com substituto de teste que não dependa de servidor SMTP real.
-- **FR-020**: A solução DEVE manter a separação de responsabilidades atual: o User Service controla dados da conta, o Cart Service controla carrinhos, o Product Service mantém o catálogo e o Gateway permanece como entrada externa.
-- **FR-021**: Contratos existentes DEVEM ser analisados e reutilizados antes de criar endpoints; caminhos e payloads novos DEVEM seguir os contratos reais e não duplicar nem quebrar operações existentes.
-- **FR-022**: Migrations já aplicadas NÃO DEVEM ser alteradas; mudanças de schema necessárias DEVEM ser aditivas, versionadas e compatíveis com os dados existentes.
-- **FR-023**: Segredos JWT, credenciais do provedor de e-mail e demais segredos DEVEM ser externos ao código e documentados como configuração de ambiente, sem valores reais em documentação versionada.
-- **FR-024**: Logs DEVEM manter correlationId e registrar apenas eventos úteis de diagnóstico, sem senha, token, JWT, credenciais ou conteúdo sensível.
-- **FR-025**: Login, recuperação e reenvio DEVEM ser avaliados quanto à limitação de tentativas. Se não houver solução existente, a necessidade DEVE ser registrada para decisão sem criar infraestrutura desnecessária.
-- **FR-026**: A implementação DEVE incluir testes automatizados para fluxos críticos de backend e frontend, incluindo autorização, isolamento de usuários, estados de falha e envio por adapter simulado.
+- **FR-020**: Se o envio do e-mail de confirmação falhar após um cadastro válido, o sistema DEVE manter a conta criada como não verificada e permitir que o usuário solicite novo envio; a interface NÃO DEVE afirmar que o e-mail foi entregue.
+- **FR-021**: A solução DEVE manter a separação de responsabilidades atual: o User Service controla dados da conta e o estado central de revogação; o Cart Service controla carrinhos; o Product Service mantém o catálogo; e o Gateway permanece como entrada externa. A adaptação de Cart e Product Services limita-se à validação das sessões revogadas, sem alterar regras de negócio.
+- **FR-022**: Contratos existentes DEVEM ser analisados e reutilizados antes de criar endpoints; caminhos e payloads novos DEVEM seguir os contratos reais e não duplicar nem quebrar operações existentes.
+- **FR-023**: Migrations já aplicadas NÃO DEVEM ser alteradas; mudanças de schema necessárias DEVEM ser aditivas, versionadas e compatíveis com os dados existentes.
+- **FR-024**: Segredos JWT, credenciais do provedor de e-mail e demais segredos DEVEM ser externos ao código e documentados como configuração de ambiente, sem valores reais em documentação versionada.
+- **FR-025**: Logs DEVEM manter correlationId e registrar apenas eventos úteis de diagnóstico, sem senha, token, JWT, credenciais ou conteúdo sensível.
+- **FR-026**: Login, recuperação e reenvio DEVEM ser avaliados quanto à limitação de tentativas. Se não houver solução existente, a necessidade DEVE ser registrada para decisão sem criar infraestrutura desnecessária.
+- **FR-027**: A implementação DEVE incluir testes automatizados para fluxos críticos de backend e frontend, incluindo autorização, isolamento de usuários, estados de falha e envio por adapter simulado.
+- **FR-028**: Contas preexistentes sem registro de e-mail verificado DEVEM confirmar o endereço antes de iniciar nova sessão após a adoção desta feature.
 
 ### Key Entities
 
@@ -265,6 +282,6 @@ Como visitante ou usuário autenticado, quero ver opções de navegação adequa
 - Contas recém-criadas não podem iniciar sessão até que o e-mail seja confirmado.
 - O escopo inicial de edição de perfil é somente o nome. Edição de e-mail fica adiada até que um fluxo explícito de nova verificação seja aprovado.
 - O frontend mantém o comportamento atual de sessão em memória. Logout limpa o estado local; revogação imediata de JWT não é presumida sem mecanismo já existente.
-- Políticas e duração exatas de senha e tokens temporários serão alinhadas ao User Service e documentadas no planejamento sem enfraquecer a segurança ou quebrar a compatibilidade existente.
+- A política exata de senha será definida no planejamento, alinhada ao User Service e sem enfraquecer a segurança ou quebrar a compatibilidade existente. O token de confirmação expira em 24 horas e o token de redefinição de senha expira em uma hora.
 - O provedor e o formato de entrega de e-mail serão escolhidos no planejamento a partir das opções suportadas no ambiente de implantação; credenciais serão fornecidas exclusivamente pelo ambiente.
 - Checkout, pagamento, pedidos, rastreamento, reserva de estoque, newsletter, marketing, fidelidade, avaliações, favoritos e OAuth social novo estão fora do escopo.
