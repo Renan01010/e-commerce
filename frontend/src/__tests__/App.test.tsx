@@ -77,6 +77,17 @@ describe('App cart navigation and badge', () => {
     expect(await screen.findByRole('heading', { name: 'Encontre algo que acompanhe seu ritmo.' })).toBeInTheDocument();
   });
 
+  it('keeps authentication routes standalone while the store header remains shared elsewhere', () => {
+    const { unmount } = render(<MemoryRouter initialEntries={['/login']}><App /></MemoryRouter>);
+    expect(screen.getByRole('main')).toHaveClass('login-screen');
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    unmount();
+
+    render(<MemoryRouter initialEntries={['/register']}><App /></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Cadastro indisponível no momento' })).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  });
+
   it('updates the header badge after a confirmed add initiated from a Home product card', async () => {
     const user = userEvent.setup();
     useAuthStore.getState().setSession({ accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000 });

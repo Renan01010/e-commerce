@@ -50,4 +50,15 @@ describe('LoginPage', () => {
       expiresAt: expect.any(Number),
     });
   });
+
+  it('keeps the login page standalone without the shared store header', () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes><Route path="/login" element={<LoginPage />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('main')).toHaveClass('login-screen');
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  });
 });

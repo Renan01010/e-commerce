@@ -130,4 +130,30 @@ describe('CatalogPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Buscar produtos')).toHaveValue('monitor'));
     expect(useCatalogStore.getState().filters.categoryId).toBe('category-1');
   });
+
+  it('preserves filter, sort, and pagination controls', async () => {
+    const user = userEvent.setup();
+    useCatalogStore.setState({ categories: [{
+      id: 'category-1', name: 'Monitores', description: null, parentCategoryId: null,
+      displayOrder: 1, isActive: true, createdAt: '', updatedAt: '',
+    }], categoriesStatus: 'loaded' });
+    vi.mocked(catalogApi.getProducts).mockImplementation(async ({ page }) => ({
+      content: [product], totalElements: 21, totalPages: 2, currentPage: page, pageSize: 20, hasMore: page === 0,
+    }));
+    render(<MemoryRouter initialEntries={['/catalog']}><CatalogPage /></MemoryRouter>);
+
+    await screen.findByRole('heading', { name: 'Fone Studio' });
+    await user.clear(screen.getByLabelText('Preço mínimo'));
+    await user.type(screen.getByLabelText('Preço mínimo'), '10');
+    await user.click(screen.getByLabelText('Somente disponíveis'));
+    await user.selectOptions(screen.getByLabelText('Ordenar produtos'), 'price-asc');
+    await user.click(screen.getByRole('button', { name: 'Próxima' }));
+
+    await waitFor(() => expect(catalogApi.getProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+      page: 1,
+      sortBy: 'price',
+      sortOrder: 'asc',
+      filters: expect.objectContaining({ minPrice: 10, inStock: true }),
+    })));
+  });
 });
