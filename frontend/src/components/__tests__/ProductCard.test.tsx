@@ -29,7 +29,7 @@ describe('ProductCard', () => {
 
   afterEach(() => useAuthStore.getState().clearSession());
 
-  it('shows product details and links to its page', () => {
+  it('shows product details, uses an accessible placeholder without image data, and links to its page', () => {
     render(<MemoryRouter><ProductCard product={product} categoryName="Áudio" /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Fone Studio' })).toBeInTheDocument();
     expect(screen.getByText((text) => text.replace(/\s/g, ' ') === 'R$ 399,90')).toBeInTheDocument();
@@ -39,6 +39,13 @@ describe('ProductCard', () => {
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Imagem indisponível para Fone Studio' })).toBeInTheDocument();
     expect(screen.queryByText('p-1')).not.toBeInTheDocument();
+  });
+
+  it('uses the actual product image when imageUrl is available', () => {
+    render(<MemoryRouter><ProductCard product={{ ...product, imageUrl: 'https://example.test/monitor.webp' }} /></MemoryRouter>);
+
+    expect(screen.getByRole('img', { name: 'Fone Studio' })).toHaveAttribute('src', 'https://example.test/monitor.webp');
+    expect(screen.getByRole('img', { name: 'Fone Studio' })).toHaveAttribute('loading', 'lazy');
   });
 
   it('does not offer a cart mutation to a visitor', () => {

@@ -423,7 +423,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .home-section-heading__subtitle { margin: 7px 0 0; color: #8f9bad; font-size: 11px; }
 .home-section-heading > a, .home-footer > a { display: inline-flex; flex: 0 0 auto; gap: 8px; align-items: center; color: #d2fa57; font-size: 10px; }
 .home-section-heading > a:hover, .home-footer > a:hover { color: #e4ff96; }
-.home-category-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.home-category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .home-category-card { position: relative; display: flex; min-height: 112px; flex-direction: column; gap: 12px; justify-content: center; padding: 13px 15px; border: 1px solid #233346; border-radius: 7px; color: #e6ebf2; background: linear-gradient(140deg, #111e2e, #0d1724); font-size: 11px; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
 .home-category-card:hover { transform: translateY(-2px); border-color: #718d4a; background: #142333; }
 .home-category-card__icon { color: #d2fa57; }
@@ -433,8 +433,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .home-product-grid { align-items: stretch; }
 .home-shell .product-card { overflow: hidden; border: 1px solid #233346; border-radius: 7px; background: #101a27; box-shadow: none; transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease; }
 .home-shell .product-card:hover { transform: translateY(-3px); border-color: #536a44; box-shadow: 0 12px 28px rgba(0, 0, 0, .22); }
-.home-shell .product-card__image-wrap { background: #f4f5f4; }
-.home-shell .product-card__image-empty { color: #66803d; background: linear-gradient(145deg, #e8ece5, #d8dfd5); }
+.home-shell .product-card__image-wrap { background: #0d1724; }
+.home-shell .product-card__image-empty {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  color: #d2fa57;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(33, 109, 133, .32), transparent 43%),
+    linear-gradient(145deg, #101e2d, #0b1320 68%, #151b31);
+  font: 600 15px var(--mono);
+  letter-spacing: .16em;
+}
+.home-shell .product-card__image-empty::before,
+.home-shell .product-card__image-empty::after {
+  position: absolute;
+  z-index: -1;
+  border: 1px solid rgba(108, 179, 193, .3);
+  border-radius: 50%;
+  content: '';
+}
+.home-shell .product-card__image-empty::before {
+  width: min(58%, 190px);
+  aspect-ratio: 1;
+  box-shadow: 0 0 40px rgba(39, 143, 166, .12), inset 0 0 32px rgba(39, 143, 166, .1);
+}
+.home-shell .product-card__image-empty::after {
+  width: min(78%, 250px);
+  aspect-ratio: 1;
+  border-color: rgba(210, 250, 87, .16);
+  transform: rotateX(64deg) rotate(-24deg);
+}
 .home-shell .product-card__body { padding: 13px; }
 .home-shell .product-card__meta { color: #a5b2c1; }
 .home-shell .product-card h2 { color: #edf1f6; }
@@ -483,7 +517,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .site-header__main .site-nav { grid-column: 1 / -1; justify-content: flex-start; }
   .site-nav__link { padding: 5px 0 8px; }
   .site-nav__link--active::after { bottom: 2px; }
-  .home-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .home-hero { min-height: 350px; }
   .home-hero__benefits { gap: 13px; }
 }
@@ -536,7 +569,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .home-section-heading h2 { font-size: 21px; }
   .home-section-heading__subtitle { max-width: 235px; font-size: 10px; }
   .home-section-heading > a { font-size: 9px; }
-  .home-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .home-category-grid { gap: 8px; }
   .home-category-card { min-height: 96px; padding: 11px; font-size: 10px; }
   .home-category-card__icon svg { width: 26px; height: 26px; }
   .home-shell .product-grid { gap: 9px; }

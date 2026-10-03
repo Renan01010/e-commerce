@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { catalogApi } from '../../services/apiClient';
@@ -76,6 +76,31 @@ describe('HomePage', () => {
     render(<MemoryRouter><HomePage /></MemoryRouter>);
 
     expect(await screen.findByText('Nenhum produto foi encontrado no catálogo.')).toBeInTheDocument();
+  });
+
+  it('adapts the category section to a small API result and keeps the catalog link', async () => {
+    vi.mocked(catalogApi.getCategories).mockResolvedValue([categories[0]]);
+    render(<MemoryRouter><HomePage /></MemoryRouter>);
+
+    const categorySection = screen.getByRole('region', { name: 'Explore por categoria' });
+    expect(await within(categorySection).findByRole('link', { name: /Acessórios/ })).toHaveAttribute(
+      'href',
+      '/catalog?categoryId=category-2',
+    );
+    expect(within(categorySection).getAllByRole('link', { name: 'Ver catálogo' })
+      .some((link) => link.getAttribute('href') === '/catalog')).toBe(true);
+    expect(within(categorySection).queryByRole('link', { name: /Monitores/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps a catalog link visible when the API returns no categories', async () => {
+    vi.mocked(catalogApi.getCategories).mockResolvedValue([]);
+    render(<MemoryRouter><HomePage /></MemoryRouter>);
+
+    const categorySection = screen.getByRole('region', { name: 'Explore por categoria' });
+    expect(await within(categorySection).findByText('Nenhuma categoria disponível no momento.')).toBeInTheDocument();
+    expect(within(categorySection).getAllByRole('link', { name: 'Ver catálogo' })
+      .some((link) => link.getAttribute('href') === '/catalog')).toBe(true);
+    expect(within(categorySection).queryByRole('link', { name: /Notebooks|Monitores|PC Gamer/ })).not.toBeInTheDocument();
   });
 
   it('keeps the category section available when recent-products loading fails', async () => {

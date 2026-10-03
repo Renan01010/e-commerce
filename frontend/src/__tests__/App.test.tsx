@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { cartApi, catalogApi } from '../services/apiClient';
@@ -41,6 +41,18 @@ describe('App cart navigation and badge', () => {
     expect(await screen.findByRole('heading', { name: /Tecnologia sem limites/ })).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Produtos' }));
     expect(await screen.findByRole('heading', { name: 'Encontre algo que acompanhe seu ritmo.' })).toBeInTheDocument();
+  });
+
+  it('uses the Home search there and keeps the header search on the catalog route', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(screen.getByRole('searchbox', { name: 'Buscar produtos no catálogo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar no catálogo' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Produtos' }));
+    expect(await screen.findByRole('button', { name: 'Buscar no catálogo' })).toBeInTheDocument();
+    expect(within(screen.getByRole('search')).getByRole('searchbox', { name: 'Buscar produtos' })).toBeInTheDocument();
   });
 
   it('exposes an accessible responsive menu with working catalog and category navigation', async () => {

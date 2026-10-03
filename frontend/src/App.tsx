@@ -70,11 +70,13 @@ function StoreLayout({ children }: { children: ReactNode }) {
           <Link className="brand-mark" to="/" aria-label="TechStore, página inicial">
             <span className="brand-mark__symbol">T</span><span>techstore</span>
           </Link>
-          <form className="header-search" role="search" onSubmit={submitHeaderSearch}>
-            <label className="sr-only" htmlFor="header-product-search">Buscar produtos</label>
-            <input id="header-product-search" type="search" placeholder="Buscar produtos, marcas ou categorias..." value={headerSearch} onChange={(event) => setHeaderSearch(event.target.value)} />
-            <button type="submit" aria-label="Buscar no catálogo"><Search size={19} aria-hidden="true" /></button>
-          </form>
+          {location.pathname !== '/' && (
+            <form className="header-search" role="search" onSubmit={submitHeaderSearch}>
+              <label className="sr-only" htmlFor="header-product-search">Buscar produtos</label>
+              <input id="header-product-search" type="search" placeholder="Buscar produtos, marcas ou categorias..." value={headerSearch} onChange={(event) => setHeaderSearch(event.target.value)} />
+              <button type="submit" aria-label="Buscar no catálogo"><Search size={19} aria-hidden="true" /></button>
+            </form>
+          )}
           <nav className={`site-nav${menuOpen ? ' site-nav--open' : ''}`} id="main-navigation" aria-label="Navegação principal">
             <Link className="site-nav__link" to="/" onClick={() => setMenuOpen(false)}>Início</Link>
             <Link className="site-nav__link" to="/catalog" onClick={() => setMenuOpen(false)}>Produtos</Link>
