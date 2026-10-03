@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { cartApi, catalogApi } from '../services/apiClient';
 import type { CartItem } from '../types/cart';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
+import { useCatalogStore } from '../store/catalogStore';
 import App from '../App';
 
 vi.mock('../services/apiClient', () => ({
@@ -23,10 +24,85 @@ describe('App cart navigation and badge', () => {
   beforeEach(() => {
     useAuthStore.getState().clearSession();
     useCartStore.setState({ items: [], status: 'idle', error: null, successMessage: null, pendingOperations: {} });
+    useCatalogStore.setState({
+      categories: [], categoriesStatus: 'idle', categoriesError: null,
+      recentProducts: [], recentProductsLoading: false, recentProductsStatus: 'idle', recentProductsError: null,
+    });
     vi.clearAllMocks();
     vi.mocked(catalogApi.getProducts).mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, currentPage: 0, pageSize: 20, hasMore: false });
     vi.mocked(catalogApi.getCategories).mockResolvedValue([]);
     vi.mocked(cartApi.getCart).mockResolvedValue({ items: cartItems, maxItemQuantity: 99, total: null, totalAvailable: false });
+  });
+
+  it('uses the Home at / and preserves the full catalog at /catalog', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: /Tecnologia sem limites/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Produtos' }));
+    expect(await screen.findByRole('heading', { name: 'Encontre algo que acompanhe seu ritmo.' })).toBeInTheDocument();
+  });
+
+  it('uses the Home search there and keeps the header search on the catalog route', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(screen.getByRole('searchbox', { name: 'Buscar produtos no catálogo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar no catálogo' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Produtos' }));
+    expect(await screen.findByRole('button', { name: 'Buscar no catálogo' })).toBeInTheDocument();
+    expect(within(screen.getByRole('search')).getByRole('searchbox', { name: 'Buscar produtos' })).toBeInTheDocument();
+  });
+
+  it('exposes an accessible responsive menu with working catalog and category navigation', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    const menu = screen.getByRole('button', { name: 'Abrir menu' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    await user.click(menu);
+    expect(screen.getByRole('button', { name: 'Fechar menu' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Acessar minha conta' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Carrinho' })).toHaveAttribute('href', '/cart');
+  });
+
+  it('sends the not-found fallback to the full catalog', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/missing-page']}><App /></MemoryRouter>);
+
+    expect(screen.getByRole('heading', { name: 'Página não encontrada' })).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Ir ao catálogo' }));
+    expect(await screen.findByRole('heading', { name: 'Encontre algo que acompanhe seu ritmo.' })).toBeInTheDocument();
+  });
+
+  it('updates the header badge after a confirmed add initiated from a Home product card', async () => {
+    const user = userEvent.setup();
+    useAuthStore.getState().setSession({ accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000 });
+    const addedItem: CartItem = {
+      productId: 'new-product', quantity: 1, available: true,
+      product: { name: 'Newest', price: 15, brand: 'Acme', imageUrl: null },
+      unitPriceSnapshot: 15, priceAvailable: true, subtotal: 15,
+    };
+    vi.mocked(cartApi.getCart).mockResolvedValue({ items: [], maxItemQuantity: 99, total: 0, totalAvailable: true });
+    vi.mocked(cartApi.addItem).mockResolvedValue({
+      items: [addedItem], maxItemQuantity: 99, total: 15, totalAvailable: true,
+    });
+    vi.mocked(catalogApi.getProducts).mockResolvedValue({
+      content: [{
+        id: 'new-product', name: 'Newest', description: null, price: 15, cost: null, brand: 'Acme',
+        sku: 'N-1', categoryId: 'category-1', quantity: 2, imageUrl: null, isActive: true, createdAt: '', updatedAt: '',
+      }],
+      totalElements: 1, totalPages: 1, currentPage: 0, pageSize: 8, hasMore: false,
+    });
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: 'Carrinho, 0 unidades' })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Adicionar Newest ao carrinho' }));
+    expect(await screen.findByRole('link', { name: 'Carrinho, 1 unidade' })).toBeInTheDocument();
+    expect(cartApi.addItem).toHaveBeenCalledTimes(1);
+    expect(useCartStore.getState().total).toBe(15);
   });
 
   it('shows the sum of all quantities and navigates to the cart without another GET', async () => {

@@ -79,6 +79,35 @@ describe('catalogApi', () => {
   });
 });
 
+describe('catalog API error messages', () => {
+  it.each([
+    [400, 'Não foi possível concluir sua busca. Confira os filtros e tente novamente.'],
+    [401, 'Sua sessão precisa ser atualizada. Tente novamente.'],
+    [403, 'Você não tem permissão para acessar este conteúdo.'],
+    [404, 'O conteúdo solicitado não está disponível.'],
+    [409, 'Não foi possível concluir a solicitação. Atualize a página e tente novamente.'],
+    [429, 'Muitas solicitações em pouco tempo. Aguarde um instante e tente novamente.'],
+    [500, 'O catálogo está temporariamente indisponível. Tente novamente.'],
+    [503, 'O catálogo está temporariamente indisponível. Tente novamente.'],
+  ])('maps HTTP %i to a safe public message', async (status, message) => {
+    const { getApiErrorMessage } = await import('../apiClient');
+    const error = Object.assign(new Error('Sensitive technical details'), {
+      isAxiosError: true,
+      response: { status, data: { message: 'Sensitive technical details' } },
+    });
+
+    expect(getApiErrorMessage(error)).toBe(message);
+  });
+
+  it('does not expose technical messages for network or unknown errors', async () => {
+    const { getApiErrorMessage } = await import('../apiClient');
+    const networkError = Object.assign(new Error('Sensitive technical details'), { isAxiosError: true });
+
+    expect(getApiErrorMessage(networkError)).toBe('Não foi possível conectar ao catálogo. Tente novamente.');
+    expect(getApiErrorMessage(new Error('Sensitive technical details'))).toBe('O catálogo não pôde ser carregado.');
+  });
+});
+
 describe('cartApi', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -118,11 +147,11 @@ describe('cartApi', () => {
   });
 
   it.each([
-    [401, 'unauthenticated'],
-    [404, 'not-found'],
-    [409, 'conflict'],
-    [503, 'unavailable'],
-  ] as const)('classifies cart HTTP error %i without changing catalog errors', async (status, kind) => {
+    [401, 'unauthenticated', 'Sua sessão precisa ser atualizada. Tente novamente.'],
+    [404, 'not-found', 'O conteúdo solicitado não está disponível.'],
+    [409, 'conflict', 'Não foi possível concluir a solicitação. Atualize a página e tente novamente.'],
+    [503, 'unavailable', 'O catálogo está temporariamente indisponível. Tente novamente.'],
+  ] as const)('classifies cart HTTP error %i and returns a safe catalog fallback', async (status, kind, message) => {
     const requestError = Object.assign(new Error('backend detail'), {
       isAxiosError: true,
       response: { status, data: { message: 'backend detail' } },
@@ -135,7 +164,7 @@ describe('cartApi', () => {
       kind,
       status,
     });
-    expect(getApiErrorMessage(requestError)).toBe('backend detail');
+    expect(getApiErrorMessage(requestError)).toBe(message);
   });
 
   it.each([

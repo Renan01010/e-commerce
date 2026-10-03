@@ -51,6 +51,7 @@ describe('ProductDetailPage', () => {
     renderProductDetail();
 
     expect(await screen.findByRole('heading', { name: 'Fone Studio' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '← Voltar ao catálogo' })).toHaveAttribute('href', '/catalog');
     const addButton = await screen.findByRole('button', { name: 'Adicionar ao carrinho' });
     await waitFor(() => expect(addButton).toBeEnabled());
     const quantity = screen.getByRole('spinbutton', { name: 'Quantidade' });

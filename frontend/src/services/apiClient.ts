@@ -154,8 +154,15 @@ export const cartApi = {
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     if (!error.response) return 'Não foi possível conectar ao catálogo. Tente novamente.';
-    const message = (error.response.data as { message?: string } | undefined)?.message;
-    return message ?? 'O catálogo não pôde ser carregado.';
+    const status = error.response.status;
+    if (status === 400) return 'Não foi possível concluir sua busca. Confira os filtros e tente novamente.';
+    if (status === 401) return 'Sua sessão precisa ser atualizada. Tente novamente.';
+    if (status === 403) return 'Você não tem permissão para acessar este conteúdo.';
+    if (status === 404) return 'O conteúdo solicitado não está disponível.';
+    if (status === 409) return 'Não foi possível concluir a solicitação. Atualize a página e tente novamente.';
+    if (status === 429) return 'Muitas solicitações em pouco tempo. Aguarde um instante e tente novamente.';
+    if (status >= 500) return 'O catálogo está temporariamente indisponível. Tente novamente.';
+    return 'O catálogo não pôde ser carregado. Tente novamente.';
   }
   return 'O catálogo não pôde ser carregado.';
 }

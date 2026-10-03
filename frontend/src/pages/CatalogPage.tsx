@@ -14,9 +14,10 @@ function categoryLabel(categoryId: string, categories: ReturnType<typeof useCata
 }
 
 export function CatalogPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryFromUrl = searchParams.get('query') ?? '';
   const categoryFromUrl = searchParams.get('categoryId');
-  const [searchInput, setSearchInput] = useState(useCatalogStore.getState().searchQuery);
+  const [searchInput, setSearchInput] = useState(queryFromUrl);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const products = useCatalogStore((state) => state.products);
   const categories = useCatalogStore((state) => state.categories);
@@ -33,32 +34,58 @@ export function CatalogPage() {
   const loadProducts = useCatalogStore((state) => state.loadProducts);
   const loadCategories = useCatalogStore((state) => state.loadCategories);
   const searchQuery = useCatalogStore((state) => state.searchQuery);
+  const urlCriteriaMatch = searchQuery === queryFromUrl && filters.categoryId === (categoryFromUrl || undefined);
   const hasInvalidPriceRange = filters.minPrice !== undefined && filters.maxPrice !== undefined
     && filters.minPrice > filters.maxPrice;
   const productCount = totalElements ?? 0;
   const featuredProduct = products[0];
 
   useEffect(() => {
-    const timer = window.setTimeout(() => useCatalogStore.getState().setSearchQuery(searchInput), 250);
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams);
+      const query = searchInput.trim();
+      if (query) params.set('query', query);
+      else params.delete('query');
+      if (params.toString() !== searchParams.toString()) setSearchParams(params);
+    }, 250);
     return () => window.clearTimeout(timer);
-  }, [searchInput]);
+  }, [searchInput, searchParams, setSearchParams]);
 
   useEffect(() => {
     void useCatalogStore.getState().loadCategories();
   }, []);
 
   useEffect(() => {
-    if (categoryFromUrl) useCatalogStore.getState().setFilters({ categoryId: categoryFromUrl });
-  }, [categoryFromUrl]);
+    setSearchInput(queryFromUrl);
+    useCatalogStore.getState().setUrlCriteria(queryFromUrl, categoryFromUrl || undefined);
+  }, [queryFromUrl, categoryFromUrl]);
 
   useEffect(() => {
-    if (!hasInvalidPriceRange) void loadProducts();
-  }, [filters, sortBy, sortOrder, currentPage, loadProducts, hasInvalidPriceRange, searchQuery]);
+    if (urlCriteriaMatch && !hasInvalidPriceRange) void loadProducts();
+  }, [filters, sortBy, sortOrder, currentPage, loadProducts, hasInvalidPriceRange, searchQuery, urlCriteriaMatch]);
 
   const setFilter = useCatalogStore((state) => state.setFilters);
   const clearFilters = useCatalogStore((state) => state.clearFilters);
   const setSort = useCatalogStore((state) => state.setSort);
   const setPage = useCatalogStore((state) => state.setPage);
+  const handleCategoryChange = (categoryId: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (categoryId) params.set('categoryId', categoryId);
+    else params.delete('categoryId');
+    setSearchParams(params);
+  };
+  const clearAll = () => {
+    setSearchInput('');
+    useCatalogStore.getState().setSearchQuery('');
+    clearFilters();
+    setSearchParams({});
+  };
+  const clearCatalogFilters = () => {
+    clearFilters();
+    const params = new URLSearchParams(searchParams);
+    params.delete('categoryId');
+    setSearchParams(params);
+  };
   const handleSort = (value: string) => {
     const [nextSort, nextOrder] = value.split('-') as [ProductSort, SortOrder];
     setSort(nextSort, nextOrder);
@@ -85,7 +112,7 @@ export function CatalogPage() {
           {searchInput && <button type="button" aria-label="Limpar busca" onClick={() => setSearchInput('')}><X size={17} aria-hidden="true" /></button>}
         </label>
         <div className="category-chips" id="catalog-categories" aria-label="Categorias em destaque">
-          {categories.slice(0, 5).map((category) => <Link key={category.id} to={`/?categoryId=${category.id}`} className="category-chip">{category.name}</Link>)}
+          {categories.slice(0, 5).map((category) => <Link key={category.id} to={`/catalog?categoryId=${encodeURIComponent(category.id)}`} className="category-chip">{category.name}</Link>)}
         </div>
       </section>
 
@@ -97,11 +124,11 @@ export function CatalogPage() {
         <aside className={`filters${filtersOpen ? ' filters--open' : ''}`} id="catalog-filters" aria-label="Filtros do catálogo">
           <div className="filters__heading">
             <div><p className="eyebrow">EXPLORAR</p><h2>Refinar</h2></div>
-            <div className="filters__actions"><button type="button" className="text-button" onClick={clearFilters}>Limpar</button><button type="button" className="filter-close" aria-label="Fechar filtros" onClick={() => setFiltersOpen(false)}><X size={18} aria-hidden="true" /></button></div>
+            <div className="filters__actions"><button type="button" className="text-button" onClick={clearCatalogFilters}>Limpar</button><button type="button" className="filter-close" aria-label="Fechar filtros" onClick={() => setFiltersOpen(false)}><X size={18} aria-hidden="true" /></button></div>
           </div>
           <label className="filter-label" htmlFor="category-filter">Categoria</label>
           <select id="category-filter" value={filters.categoryId ?? ''}
-            onChange={(event) => setFilter({ categoryId: event.target.value || undefined })}>
+            onChange={(event) => handleCategoryChange(event.target.value)}>
             <option value="">Todas as categorias</option>
             {categories.map((category) => <option key={category.id} value={category.id}>{categoryLabel(category.id, categories)}</option>)}
           </select>
@@ -145,7 +172,7 @@ export function CatalogPage() {
           {searchQuery && <p className="search-summary">Resultados para <strong>“{searchQuery}”</strong></p>}
           {hasInvalidPriceRange && <div className="notice notice--error" role="alert">O preço mínimo deve ser menor ou igual ao preço máximo.</div>}
           {error && <div className="notice notice--error" role="alert">{error} <button type="button" className="text-button" onClick={() => void loadProducts()}>Tentar novamente</button></div>}
-          {categoriesError && <div className="notice notice--error" role="alert">As categorias não puderam ser carregadas. <button type="button" className="text-button" onClick={() => void loadCategories()}>Tentar novamente</button></div>}
+          {categoriesError && <div className="notice notice--error" role="alert">As categorias não puderam ser carregadas. <button type="button" className="text-button" onClick={() => void loadCategories(true)}>Tentar novamente</button></div>}
           {isLoading ? (
             <div className="loading-grid" aria-label="Carregando produtos">
               {Array.from({ length: 6 }, (_, index) => <div className="skeleton" key={index} />)}
@@ -157,7 +184,7 @@ export function CatalogPage() {
               <p className="eyebrow">NENHUM RESULTADO</p>
               <h2>Não encontramos produtos por aqui.</h2>
               <p>Tente ajustar a busca ou remover alguns filtros.</p>
-              <button type="button" className="button button--outline" onClick={() => { setSearchInput(''); clearFilters(); }}>Limpar busca e filtros</button>
+              <button type="button" className="button button--outline" onClick={clearAll}>Limpar busca e filtros</button>
             </div>
           ) : null}
 
