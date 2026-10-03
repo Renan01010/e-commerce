@@ -71,7 +71,7 @@ export function ProductDetailPage() {
       </nav>
       <section className="product-detail">
         <div className="product-detail__media">
-          {product.imageUrl && !imageFailed ? <img src={product.imageUrl} alt={product.name} onError={() => setImageFailed(true)} /> : <div className="product-detail__image-empty">TECHSTORE</div>}
+          {product.imageUrl && !imageFailed ? <img src={product.imageUrl} alt={product.name} onError={() => setImageFailed(true)} /> : <div className="product-detail__image-empty" role="img" aria-label={`Imagem indisponível para ${product.name}`}>TECHSTORE</div>}
         </div>
         <div className="product-detail__content">
           <p className="eyebrow">{product.brand || 'TECHSTORE'} / {product.sku}</p>

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { cartApi, catalogApi } from '../../services/apiClient';
@@ -88,6 +88,26 @@ describe('ProductDetailPage', () => {
     await user.type(quantity, '5');
     expect(screen.getByRole('button', { name: 'Adicionar ao carrinho' })).toBeDisabled();
     expect(cartApi.addItem).not.toHaveBeenCalled();
+  });
+
+  it('uses the real image when available and an accessible brand fallback when it fails', async () => {
+    vi.mocked(catalogApi.getProduct).mockResolvedValue({
+      ...product,
+      imageUrl: 'https://example.test/product.webp',
+    });
+    renderProductDetail();
+
+    const image = await screen.findByRole('img', { name: 'Fone Studio' });
+    expect(image).toHaveAttribute('src', 'https://example.test/product.webp');
+    fireEvent.error(image);
+
+    expect(screen.getByRole('img', { name: 'Imagem indisponível para Fone Studio' })).toHaveTextContent('TECHSTORE');
+  });
+
+  it('announces an accessible brand fallback when the product has no image', async () => {
+    renderProductDetail();
+
+    expect(await screen.findByRole('img', { name: 'Imagem indisponível para Fone Studio' })).toHaveTextContent('TECHSTORE');
   });
 
   it('keeps add disabled after a failed cart load and enables it only after retry succeeds', async () => {

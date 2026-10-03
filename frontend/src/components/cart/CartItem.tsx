@@ -26,7 +26,7 @@ export function CartItem({ item, pending, maxItemQuantity = 99, onQuantityChange
         {!unavailable && product.imageUrl && !imageFailed ? (
           <img src={product.imageUrl} alt={product.name} onError={() => setImageFailed(true)} />
         ) : (
-          <div className="cart-item__image-empty" aria-label={unavailable ? 'Produto indisponível' : 'Imagem indisponível'}>
+          <div className="cart-item__image-empty" role="img" aria-label={unavailable ? 'Produto indisponível' : `Imagem indisponível para ${label}`}>
             {unavailable ? <AlertCircle size={22} aria-hidden="true" /> : <ImageOff size={22} aria-hidden="true" />}
           </div>
         )}

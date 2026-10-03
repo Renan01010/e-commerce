@@ -139,4 +139,20 @@ describe('CartItem', () => {
     await user.keyboard('{Enter}');
     expect(onRemove).toHaveBeenCalledWith('product-1');
   });
+
+  it('exposes an accessible fallback when the product image is missing or fails', () => {
+    const { rerender } = render(<CartItem item={availableItem} pending={false}
+      onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByRole('img', { name: 'Imagem indisponível para Keyboard' })).toBeInTheDocument();
+
+    const itemWithImage = {
+      ...availableItem,
+      product: { ...availableItem.product!, imageUrl: 'https://example.test/keyboard.png' },
+    };
+    rerender(<CartItem item={itemWithImage} pending={false}
+      onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    fireEvent.error(screen.getByRole('img', { name: 'Keyboard' }));
+
+    expect(screen.getByRole('img', { name: 'Imagem indisponível para Keyboard' })).toBeInTheDocument();
+  });
 });
