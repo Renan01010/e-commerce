@@ -111,7 +111,7 @@ export function CartPage() {
               <ShoppingBag size={34} aria-hidden="true" />
               <h2>Seu carrinho está vazio.</h2>
               <p>Encontre produtos para adicionar ao seu carrinho.</p>
-              <Link className="button button--primary" to="/">Explorar produtos <ArrowRight size={15} aria-hidden="true" /></Link>
+              <Link className="button button--primary" to="/catalog">Explorar produtos <ArrowRight size={15} aria-hidden="true" /></Link>
             </div>
           ) : (
             <div className="cart-items" aria-label="Produtos no carrinho">
@@ -148,7 +148,7 @@ export function CartPage() {
                   : 'Total indisponível até que o serviço confirme o resumo.'}</p>
               )}
             </div>
-            <Link className="cart-continue button button--primary" to="/">
+            <Link className="cart-continue button button--primary" to="/catalog">
               <ShoppingBag size={16} aria-hidden="true" /> Continuar comprando
             </Link>
             {items.length > 0 && (

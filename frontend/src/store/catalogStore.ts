@@ -4,7 +4,12 @@ import type { CatalogFilters, Category, Product, ProductPage, ProductSort, SortO
 
 interface CatalogState {
   products: Product[];
+  recentProducts: Product[];
+  recentProductsLoading: boolean;
+  recentProductsStatus: 'idle' | 'loading' | 'loaded' | 'error';
+  recentProductsError: string | null;
   categories: Category[];
+  categoriesStatus: 'idle' | 'loading' | 'loaded' | 'error';
   selectedProduct: Product | null;
   searchQuery: string;
   filters: CatalogFilters;
@@ -19,12 +24,14 @@ interface CatalogState {
   error: string | null;
   categoriesError: string | null;
   setSearchQuery: (searchQuery: string) => void;
+  setUrlCriteria: (searchQuery: string, categoryId?: string) => void;
   setFilters: (filters: Partial<CatalogFilters>) => void;
   clearFilters: () => void;
   setSort: (sortBy: ProductSort, sortOrder: SortOrder) => void;
   setPage: (page: number) => void;
   loadProducts: () => Promise<void>;
-  loadCategories: () => Promise<void>;
+  loadRecentProducts: (retry?: boolean) => Promise<void>;
+  loadCategories: (retry?: boolean) => Promise<void>;
   loadProduct: (id: string) => Promise<Product | null>;
 }
 
@@ -33,12 +40,20 @@ const emptyPage: ProductPage = {
 };
 
 let productsRequestId = 0;
+let recentProductsRequestId = 0;
 let categoriesRequestId = 0;
 let productRequestId = 0;
+let pendingRecentProducts: Promise<void> | null = null;
+let pendingCategories: Promise<void> | null = null;
 
 export const useCatalogStore = create<CatalogState>((set, get) => ({
   products: [],
+  recentProducts: [],
+  recentProductsLoading: false,
+  recentProductsStatus: 'idle',
+  recentProductsError: null,
   categories: [],
+  categoriesStatus: 'idle',
   selectedProduct: null,
   searchQuery: '',
   filters: {},
@@ -53,6 +68,11 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
   error: null,
   categoriesError: null,
   setSearchQuery: (searchQuery) => set({ searchQuery, currentPage: 0 }),
+  setUrlCriteria: (searchQuery, categoryId) => set((state) => {
+    const filters = { ...state.filters, categoryId };
+    if (state.searchQuery === searchQuery && state.filters.categoryId === categoryId) return state;
+    return { searchQuery, filters, currentPage: 0 };
+  }),
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters }, currentPage: 0 })),
   clearFilters: () => set({ filters: {}, currentPage: 0 }),
   setSort: (sortBy, sortOrder) => set({ sortBy, sortOrder, currentPage: 0 }),
@@ -80,15 +100,58 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
       set({ ...emptyPage, error: getApiErrorMessage(error), isLoading: false });
     }
   },
-  loadCategories: async () => {
+  loadRecentProducts: (retry = false) => {
+    const state = get();
+    if (state.recentProductsLoading && pendingRecentProducts && !retry) return pendingRecentProducts;
+    if (state.recentProductsStatus === 'loaded' && !retry) return Promise.resolve();
+
+    const requestId = ++recentProductsRequestId;
+    set({ recentProductsLoading: true, recentProductsStatus: 'loading', recentProductsError: null });
+    const promise = Promise.resolve().then(async () => {
+      try {
+        const page = await catalogApi.getProducts({
+          query: '',
+          filters: {},
+          sortBy: 'newest',
+          sortOrder: 'desc',
+          page: 0,
+          pageSize: 8,
+        });
+        if (requestId === recentProductsRequestId) {
+          set({ recentProducts: page.content ?? [], recentProductsLoading: false, recentProductsStatus: 'loaded' });
+        }
+      } catch (error) {
+        if (requestId === recentProductsRequestId) {
+          set({ recentProductsError: getApiErrorMessage(error), recentProductsLoading: false, recentProductsStatus: 'error' });
+        }
+      } finally {
+        if (pendingRecentProducts === promise) pendingRecentProducts = null;
+      }
+    });
+    pendingRecentProducts = promise;
+    return promise;
+  },
+  loadCategories: (retry = false) => {
+    const state = get();
+    if (state.categoriesStatus === 'loading' && pendingCategories && !retry) return pendingCategories;
+    if (state.categoriesStatus === 'loaded' && !retry) return Promise.resolve();
+
     const requestId = ++categoriesRequestId;
-    set({ categoriesError: null });
-    try {
-      const categories = await catalogApi.getCategories();
-      if (requestId === categoriesRequestId) set({ categories });
-    } catch (error) {
-      if (requestId === categoriesRequestId) set({ categoriesError: getApiErrorMessage(error) });
-    }
+    set({ categoriesError: null, categoriesStatus: 'loading' });
+    const promise = Promise.resolve().then(async () => {
+      try {
+        const categories = await catalogApi.getCategories();
+        if (requestId === categoriesRequestId) set({ categories, categoriesStatus: 'loaded' });
+      } catch (error) {
+        if (requestId === categoriesRequestId) {
+          set({ categoriesError: getApiErrorMessage(error), categoriesStatus: 'error' });
+        }
+      } finally {
+        if (pendingCategories === promise) pendingCategories = null;
+      }
+    });
+    pendingCategories = promise;
+    return promise;
   },
   loadProduct: async (id) => {
     const requestId = ++productRequestId;
