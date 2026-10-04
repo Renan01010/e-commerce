@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { accountService } from '../services/accountService';
 import { cartApi, catalogApi } from '../services/apiClient';
 import type { CartItem } from '../types/cart';
+import type { UserProfile } from '../types/auth';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 import { useCatalogStore } from '../store/catalogStore';
@@ -14,6 +16,14 @@ vi.mock('../services/apiClient', () => ({
   cartApi: { getCart: vi.fn(), addItem: vi.fn(), setQuantity: vi.fn(), removeItem: vi.fn(), clearCart: vi.fn() },
   getApiErrorMessage: () => 'Erro do catálogo',
 }));
+
+vi.mock('../services/accountService', () => ({
+  accountService: { getProfile: vi.fn(), updateName: vi.fn(), changePassword: vi.fn() },
+}));
+
+const userProfile: UserProfile = {
+  id: 'user-1', name: 'Ana Silva', email: 'ana@example.com', emailVerified: true,
+};
 
 const cartItems: CartItem[] = [
   { productId: 'product-1', quantity: 2, available: true, product: { name: 'Keyboard', price: 49.9, brand: 'Acme', imageUrl: null }, unitPriceSnapshot: 49.9, priceAvailable: true, subtotal: 99.8 },
@@ -29,6 +39,7 @@ describe('App cart navigation and badge', () => {
       recentProducts: [], recentProductsLoading: false, recentProductsStatus: 'idle', recentProductsError: null,
     });
     vi.clearAllMocks();
+    vi.mocked(accountService.getProfile).mockResolvedValue(userProfile);
     vi.mocked(catalogApi.getProducts).mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, currentPage: 0, pageSize: 20, hasMore: false });
     vi.mocked(catalogApi.getCategories).mockResolvedValue([]);
     vi.mocked(cartApi.getCart).mockResolvedValue({ items: cartItems, maxItemQuantity: 99, total: null, totalAvailable: false });
@@ -64,7 +75,7 @@ describe('App cart navigation and badge', () => {
     await user.click(menu);
     expect(screen.getByRole('button', { name: 'Fechar menu' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Acessar minha conta' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Entrar na minha conta' })).toHaveAttribute('href', '/login');
     expect(screen.getByRole('link', { name: 'Carrinho' })).toHaveAttribute('href', '/cart');
   });
 
@@ -84,8 +95,72 @@ describe('App cart navigation and badge', () => {
     unmount();
 
     render(<MemoryRouter initialEntries={['/register']}><App /></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'Cadastro indisponível no momento' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Crie sua conta' })).toBeInTheDocument();
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  });
+
+  it('guards account routes and preserves their safe destination through login', async () => {
+    render(<MemoryRouter initialEntries={['/account/security?tab=password']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Acesse sua conta' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Segurança' })).not.toBeInTheDocument();
+  });
+
+  it('treats an expired in-memory session as unauthenticated for account routes', async () => {
+    useAuthStore.getState().setSession({
+      accessToken: 'expired-token', tokenType: 'Bearer', expiresAt: Date.now() - 1,
+    });
+    render(<MemoryRouter initialEntries={['/account']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Acesse sua conta' })).toBeInTheDocument();
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Minha conta' })).not.toBeInTheDocument();
+  });
+
+  it('loads the authenticated profile for the header without blocking the store', async () => {
+    let resolveProfile!: (profile: UserProfile) => void;
+    vi.mocked(accountService.getProfile).mockImplementation(() => new Promise((resolve) => {
+      resolveProfile = resolve;
+    }));
+    useAuthStore.getState().setSession({
+      accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000,
+    });
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: /Tecnologia sem limites/ })).toBeInTheDocument();
+    expect(screen.getByText('Carregando...')).toHaveAttribute('aria-busy', 'true');
+    expect(accountService.getProfile).toHaveBeenCalledTimes(1);
+
+    resolveProfile(userProfile);
+    expect(await screen.findByText('Ana Silva')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Minha conta' })).toBeInTheDocument();
+  });
+
+  it('logs out locally without calling the destructive cart endpoint', async () => {
+    const user = userEvent.setup();
+    useAuthStore.getState().setSession({
+      accessToken: 'valid-token', tokenType: 'Bearer', expiresAt: Date.now() + 60_000,
+    });
+    useCartStore.setState({ items: cartItems, status: 'loaded' });
+    useCatalogStore.setState({
+      products: [{ id: 'private-product' } as never],
+      recentProducts: [{ id: 'private-recent-product' } as never],
+      selectedProduct: { id: 'private-selected-product' } as never,
+    });
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('button', { name: 'Sair' }));
+
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useCartStore.getState().items).toEqual([]);
+    expect(useCartStore.getState().status).toBe('idle');
+    expect(useCartStore.getState().total).toBeNull();
+    expect(useCatalogStore.getState().products).toEqual([]);
+    expect(useCatalogStore.getState().recentProducts).toEqual([]);
+    expect(useCatalogStore.getState().selectedProduct).toBeNull();
+    expect(await screen.findByRole('heading', { name: /Tecnologia sem limites/ })).toBeInTheDocument();
+    expect(cartApi.clearCart).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Criar conta' })).toHaveAttribute('href', '/register');
   });
 
   it('updates the header badge after a confirmed add initiated from a Home product card', async () => {

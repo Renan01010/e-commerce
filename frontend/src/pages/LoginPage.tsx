@@ -1,6 +1,6 @@
 import { Headphones, Laptop, Monitor, ShoppingCart, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CreateAccountLink } from '../components/auth/CreateAccountLink';
 import { LoginForm } from '../components/auth/LoginForm';
 import { AuthServiceError, authService } from '../services/authService';
@@ -10,6 +10,7 @@ import './LoginPage.css';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setSession = useAuthStore((state) => state.setSession);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -24,7 +25,13 @@ export function LoginPage() {
         tokenType: response.tokenType,
         expiresAt: Date.now() + response.expiresIn * 1000,
       });
-      navigate('/', { replace: true });
+      const state = location.state as { from?: unknown } | null;
+      const destination = typeof state?.from === 'string'
+        && state.from.startsWith('/')
+        && !state.from.startsWith('//')
+        ? state.from
+        : '/';
+      navigate(destination, { replace: true });
     } catch (error) {
       setErrorMessage(error instanceof AuthServiceError
         ? error.message
@@ -66,6 +73,10 @@ export function LoginPage() {
           </Link>
           <p className="login-panel__intro">Acesse sua conta</p>
           <LoginForm onSubmit={handleLogin} isSubmitting={isSubmitting} errorMessage={errorMessage} />
+          <p className="login-recovery-link"><Link to="/forgot-password">Esqueceu sua senha?</Link></p>
+          <p className="account-flow-footer login-verification-link">
+            <Link to="/verify-email/resend">Não recebeu a confirmação? Solicitar novo link</Link>
+          </p>
           <CreateAccountLink />
           <p className="login-panel__secure"><Headphones aria-hidden="true" size={15} /> Suporte TechStore</p>
         </div>

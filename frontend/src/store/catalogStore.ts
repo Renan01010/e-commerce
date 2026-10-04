@@ -33,6 +33,7 @@ interface CatalogState {
   loadRecentProducts: (retry?: boolean) => Promise<void>;
   loadCategories: (retry?: boolean) => Promise<void>;
   loadProduct: (id: string) => Promise<Product | null>;
+  resetCatalog: () => void;
 }
 
 const emptyPage: ProductPage = {
@@ -166,5 +167,35 @@ export const useCatalogStore = create<CatalogState>((set, get) => ({
       set({ error: getApiErrorMessage(error), isLoading: false });
       return null;
     }
+  },
+  resetCatalog: () => {
+    productsRequestId += 1;
+    recentProductsRequestId += 1;
+    categoriesRequestId += 1;
+    productRequestId += 1;
+    pendingRecentProducts = null;
+    pendingCategories = null;
+    set({
+      products: [],
+      recentProducts: [],
+      recentProductsLoading: false,
+      recentProductsStatus: 'idle',
+      recentProductsError: null,
+      categories: [],
+      categoriesStatus: 'idle',
+      selectedProduct: null,
+      searchQuery: '',
+      filters: {},
+      sortBy: 'relevance',
+      sortOrder: 'desc',
+      currentPage: 0,
+      pageSize: 20,
+      totalElements: 0,
+      totalPages: 0,
+      hasMore: false,
+      isLoading: false,
+      error: null,
+      categoriesError: null,
+    });
   },
 }));

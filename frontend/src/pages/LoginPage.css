@@ -106,6 +106,25 @@
 .login-panel__secure { display: flex; justify-content: center; align-items: center; gap: 7px; margin: 28px 0 0; color: #8290a4; font-size: 11px; }
 .login-panel__secure svg { color: var(--login-accent); }
 .login-panel__footer { margin-top: 34px; color: #6f7d90; text-align: center; font: 10px 'DM Mono', monospace; }
+.login-recovery-link { margin: -8px 0 0; text-align: right; font-size: 12px; }
+.login-recovery-link a, .login-verification-link a { color: var(--tech-accent); }
+.login-recovery-link a:hover, .login-verification-link a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.account-flow-screen { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 38px 20px; color: var(--tech-text); background: radial-gradient(ellipse at top, #15283a 0%, var(--tech-background) 55%); font-family: 'DM Sans', sans-serif; }
+.account-flow-panel { width: min(100%, 520px); padding: clamp(25px, 5vw, 46px); border: 1px solid var(--tech-border); border-radius: 12px; background: rgb(16 26 39 / 94%); box-shadow: 0 24px 70px rgb(0 0 0 / 28%); }
+.account-flow-panel h1 { margin: 0; color: var(--tech-text); text-align: center; font: 600 clamp(27px, 5vw, 36px)/1.12 'Space Grotesk', sans-serif; }
+.account-flow-eyebrow { margin: 24px 0 9px; text-align: center; }
+.account-flow-description { margin: 12px auto 25px; color: var(--tech-muted); text-align: center; font-size: 14px; line-height: 1.55; }
+.account-flow-form { gap: 15px; }
+.account-flow-form .login-field__control input { padding: 0; }
+.account-flow-footer { margin: 24px 0 0; color: var(--tech-muted); text-align: center; font-size: 13px; }
+.account-flow-footer a, .account-flow-links a, .account-flow-result a, .account-flow-secondary-link { color: var(--tech-accent); }
+.account-flow-result { display: grid; gap: 15px; margin: 0; color: var(--tech-text); text-align: center; line-height: 1.6; }
+.account-flow-result p { margin: 0; }
+.account-flow-link-button { text-decoration: none; }
+.account-flow-secondary-link { text-align: center; font-size: 13px; }
+.account-flow-status { color: var(--tech-muted); text-align: center; }
+.account-flow-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 24px; font-size: 13px; }
+.account-flow-footer a:hover, .account-flow-links a:hover, .account-flow-result a:hover, .account-flow-secondary-link:hover { color: var(--tech-accent-hover); text-decoration: underline; text-underline-offset: 3px; }
 
 .register-placeholder { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px; color: var(--tech-text); background: var(--tech-background); font-family: 'DM Sans', sans-serif; }
 .register-placeholder__brand { position: absolute; top: 34px; left: clamp(20px, 5vw, 72px); display: inline-flex; align-items: center; gap: 8px; color: inherit; font: 700 23px 'Space Grotesk', sans-serif; }

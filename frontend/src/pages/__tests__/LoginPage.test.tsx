@@ -61,4 +61,29 @@ describe('LoginPage', () => {
     expect(screen.getByRole('main')).toHaveClass('login-screen');
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   });
+
+  it('returns to a safe protected destination provided by the route guard', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authService.login).mockResolvedValue({
+      accessToken: 'valid-access-token', tokenType: 'Bearer', expiresIn: 3600,
+    });
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: '/login',
+        state: { from: '/account/security?tab=password' },
+      }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/account/security" element={<h1>Segurança da conta</h1>} />
+          <Route path="/" element={<h1>TechStore Home</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('E-mail'), 'client@example.com');
+    await user.type(screen.getByLabelText('Senha'), 'correct-password');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByRole('heading', { name: 'Segurança da conta' })).toBeInTheDocument();
+  });
 });

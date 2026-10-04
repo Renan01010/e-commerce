@@ -20,6 +20,7 @@ interface CartState {
   setQuantity: (productId: string, quantity: number) => Promise<boolean>;
   removeItem: (productId: string) => Promise<boolean>;
   clearCart: () => Promise<boolean>;
+  resetLocalCart: () => void;
   retrySummary: () => Promise<void>;
   dismissFeedback: () => void;
 }
@@ -388,6 +389,22 @@ export const useCartStore = create<CartState>((set, get) => ({
     'Carrinho limpo.',
     () => [],
   ),
+
+  resetLocalCart: () => {
+    requestVersion += 1;
+    pendingLoad = null;
+    set({
+      items: [],
+      maxItemQuantity: 99,
+      total: null,
+      totalAvailable: false,
+      status: 'idle',
+      error: null,
+      summaryRefreshError: null,
+      successMessage: null,
+      pendingOperations: {},
+    });
+  },
 
   retrySummary: retryCartSummary,
 

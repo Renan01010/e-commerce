@@ -1,21 +1,43 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
+import { LogOut, Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { CatalogPage } from './pages/CatalogPage';
 import { HomePage } from './pages/HomePage';
 import { CartPage } from './pages/CartPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
-import { RegisterUnavailablePage } from './pages/RegisterUnavailablePage';
+import { RegisterPage } from './pages/RegisterPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { ResendVerificationPage } from './pages/ResendVerificationPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { AccountPage } from './pages/AccountPage';
+import { AccountSecurityPage } from './pages/AccountSecurityPage';
+import { RequireAuth } from './components/auth/RequireAuth';
+import { accountService } from './services/accountService';
 import { useAuthStore } from './store/authStore';
 import { useCartStore } from './store/cartStore';
 import { useCatalogStore } from './store/catalogStore';
+
+useAuthStore.subscribe((state, previousState) => {
+  if (state.session !== previousState.session) {
+    useCartStore.getState().resetLocalCart();
+    useCatalogStore.getState().resetCatalog();
+    void useCatalogStore.getState().loadCategories();
+  }
+});
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterUnavailablePage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/verify-email/resend" element={<ResendVerificationPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/account" element={<RequireAuth><StoreLayout><AccountPage /></StoreLayout></RequireAuth>} />
+      <Route path="/account/security" element={<RequireAuth><StoreLayout><AccountSecurityPage /></StoreLayout></RequireAuth>} />
       <Route path="/" element={<StoreLayout><HomePage /></StoreLayout>} />
       <Route path="/catalog" element={<StoreLayout><CatalogPage /></StoreLayout>} />
       <Route path="/products/:id" element={<StoreLayout><ProductDetailPage /></StoreLayout>} />
@@ -28,9 +50,12 @@ export default function App() {
 function StoreLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerSearch, setHeaderSearch] = useState('');
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const session = useAuthStore((state) => state.session);
+  const profile = useAuthStore((state) => state.profile);
+  const clearSession = useAuthStore((state) => state.clearSession);
   const items = useCartStore((state) => state.items);
   const cartStatus = useCartStore((state) => state.status);
   const loadCart = useCartStore((state) => state.loadCart);
@@ -41,11 +66,40 @@ function StoreLayout({ children }: { children: ReactNode }) {
     [categories],
   );
   const cartUnits = items.reduce((sum, item) => sum + item.quantity, 0);
-  const hasConfirmedCart = Boolean(session && session.expiresAt > Date.now() && cartStatus === 'loaded');
+  const isAuthenticated = Boolean(session && session.expiresAt > Date.now());
+  const hasConfirmedCart = Boolean(isAuthenticated && cartStatus === 'loaded');
 
   useEffect(() => {
     if (session && session.expiresAt > Date.now()) void loadCart();
   }, [session, loadCart]);
+
+  useEffect(() => {
+    if (!isAuthenticated || profile) {
+      setIsProfileLoading(false);
+      return;
+    }
+
+    let active = true;
+    setIsProfileLoading(true);
+    void accountService.getProfile()
+      .then((loadedProfile) => {
+        if (active && useAuthStore.getState().getValidSession() === session) {
+          useAuthStore.getState().setProfile(loadedProfile);
+        }
+      })
+      .catch(() => {
+        if (active && useAuthStore.getState().getValidSession() === session) {
+          console.warn('Unable to load the authenticated profile for the header.');
+        }
+      })
+      .finally(() => {
+        if (active) setIsProfileLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, profile, session]);
 
   useEffect(() => {
     void loadCategories();
@@ -61,6 +115,11 @@ function StoreLayout({ children }: { children: ReactNode }) {
     const query = headerSearch.trim();
     navigate(query ? `/catalog?query=${encodeURIComponent(query)}` : '/catalog');
     setMenuOpen(false);
+  }
+
+  function logout() {
+    clearSession();
+    navigate('/', { replace: true });
   }
 
   return (
@@ -84,9 +143,26 @@ function StoreLayout({ children }: { children: ReactNode }) {
           </nav>
         </div>
         <div className="site-actions">
-          <Link className="header-action" to="/login" aria-label="Acessar minha conta">
-            <UserRound size={17} strokeWidth={1.8} aria-hidden="true" /><span>Conta</span>
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link className="header-action" to="/account" aria-label="Minha conta">
+                <span className="account-avatar" aria-hidden="true">{profile?.name?.trim().charAt(0).toUpperCase() || <UserRound size={16} />}</span>
+                <span aria-busy={isProfileLoading}>
+                  {profile?.name?.trim() || (isProfileLoading ? 'Carregando...' : 'Minha conta')}
+                </span>
+              </Link>
+              <button className="header-action" type="button" onClick={logout}>
+                <LogOut size={17} strokeWidth={1.8} aria-hidden="true" /><span>Sair</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Link className="header-action" to="/login" aria-label="Entrar na minha conta">
+                <UserRound size={17} strokeWidth={1.8} aria-hidden="true" /><span>Entrar</span>
+              </Link>
+              <Link className="header-action header-action--muted" to="/register">Criar conta</Link>
+            </>
+          )}
           <Link className="header-action header-cart" to="/cart" aria-label={hasConfirmedCart ? `Carrinho, ${cartUnits} ${cartUnits === 1 ? 'unidade' : 'unidades'}` : 'Carrinho'}>
             <ShoppingBag size={17} strokeWidth={1.8} aria-hidden="true" /><span>Carrinho</span>
             {hasConfirmedCart && <small aria-hidden="true">{cartUnits}</small>}

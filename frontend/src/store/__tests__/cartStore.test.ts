@@ -100,6 +100,36 @@ describe('cartStore', () => {
     expect(useCartStore.getState().totalAvailable).toBe(true);
   });
 
+  it('resets private cart state locally without deleting the server cart', () => {
+    setAuthenticatedSession();
+    useCartStore.setState({
+      items: [availableItem],
+      maxItemQuantity: 4,
+      total: 99.8,
+      totalAvailable: true,
+      status: 'loaded',
+      error: 'previous error',
+      summaryRefreshError: 'previous summary error',
+      successMessage: 'previous success',
+      pendingOperations: { update: true },
+    });
+
+    useCartStore.getState().resetLocalCart();
+
+    expect(useCartStore.getState()).toMatchObject({
+      items: [],
+      maxItemQuantity: 99,
+      total: null,
+      totalAvailable: false,
+      status: 'idle',
+      error: null,
+      summaryRefreshError: null,
+      successMessage: null,
+      pendingOperations: {},
+    });
+    expect(cartApi.clearCart).not.toHaveBeenCalled();
+  });
+
   it('fetches the authoritative financial summary after clearing', async () => {
     setAuthenticatedSession();
     useCartStore.setState({ items: [availableItem], total: 99.8, totalAvailable: true, status: 'loaded' });

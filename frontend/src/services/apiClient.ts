@@ -16,6 +16,18 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const authorization = error.config?.headers?.get?.('Authorization')
+        ?? (error.config?.headers as Record<string, unknown> | undefined)?.Authorization;
+      if (authorization) useAuthStore.getState().clearSession();
+    }
+    return Promise.reject(error);
+  },
+);
+
 export interface ProductQuery {
   query: string;
   filters: CatalogFilters;
